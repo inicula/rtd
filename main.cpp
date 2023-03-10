@@ -28,6 +28,7 @@ enum class TokenType : u8 {
 struct NFANode {
     NFANode* neighbours[2] = {};
     char symbols[2] = {};
+    usize id = 0;
     bool visited = {};
 };
 
@@ -49,6 +50,7 @@ static constexpr auto OP_PREC = []() {
 }();
 
 /* Functions declarations */
+static void fmt_perror(const char*);
 static TokenType type_of(char);
 static std::string add_concatenation_op(const std::string&);
 static std::optional<std::string> get_postfix(const std::string&);
@@ -56,6 +58,12 @@ static std::optional<NFANode*> get_nfa(const std::string&);
 static void get_nodes(NFANode*, std::vector<NFANode*>&);
 
 /* Functions definitions  */
+void
+fmt_perror(const char* why)
+{
+    fmt::print("{}: {}\n", why, strerror(errno));
+}
+
 TokenType
 type_of(char token)
 {
@@ -219,10 +227,45 @@ get_nodes(NFANode* root, std::vector<NFANode*>& nodes)
         return;
 
     root->visited = true;
+    root->id = nodes.size();
     nodes.push_back(root);
 
     get_nodes(root->neighbours[0], nodes);
     get_nodes(root->neighbours[1], nodes);
+}
+
+void
+make_graph(const char* path)
+{
+    char gname[] = "g";
+    GVC_t* gvc = gvContext();
+    Agraph_t* g = agopen(gname, Agdirected, 0);
+
+    char name[] = "a";
+    std::vector<Agnode_t*> gvc_nodes(nodes.size(), nullptr);
+    for (usize i = 0; i < nodes.size(); ++i) {
+        gvc_nodes[i] = agnode(g, name, 1);
+        if (++name[0] > 'z')
+            name[0] = 'a';
+    }
+
+    for (usize i = 0; i < nodes.size(); ++i) {
+        if (nodes[i]->neighbours[0])
+            agedge(g, gvc_nodes[i], gvc_nodes[nodes[i]->neighbours[0]->id], 0, 1);
+        if (nodes[i]->neighbours[1])
+            agedge(g, gvc_nodes[i], gvc_nodes[nodes[i]->neighbours[1]->id], 0, 1);
+    }
+
+    auto file = fopen(path, "w");
+    if (!file) {
+        fmt_perror("fopen");
+        return;
+    }
+
+    gvLayout(gvc, g, "dot");
+    gvRender(gvc, g, "dot", file);
+    gvFreeLayout(gvc, g);
+    agclose(g);
 }
 
 int
@@ -257,6 +300,7 @@ main(const int argc, const char* argv[])
     auto root = get_nfa(*postfix);
     if (root) {
         get_nodes(*root, nodes);
+        make_graph("graph.dot");
 
         for (NFANode* node : nodes)
             delete node;

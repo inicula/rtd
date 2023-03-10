@@ -1,6 +1,6 @@
 CXX=g++
 CXXFLAGS=-std=c++20 -Os -fno-exceptions -fno-rtti -march=native -Wall -Wextra -Wpedantic -Wconversion
-LIBS=-lfmt
+LIBS=`pkg-config fmt libgvc --libs`
 OBJS=main.o
 
 default: rtd
