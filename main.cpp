@@ -176,13 +176,11 @@ get_nfa(const std::string& postfix)
 
             if (token == OP_CONCAT) {
                 *(x.finish) = {{y.start}, {S_LAMBDA}};
-
                 q = x.start;
                 f = y.finish;
             } else {
                 q = new Node{{x.start, y.start}, {S_LAMBDA, S_LAMBDA}};
                 f = new Node{};
-
                 *(x.finish) = {{f}, {S_LAMBDA}};
                 *(y.finish) = {{f}, {S_LAMBDA}};
             }
@@ -195,7 +193,6 @@ get_nfa(const std::string& postfix)
 
             f = new Node{};
             q = new Node{{x.start, f}, {S_LAMBDA, S_LAMBDA}};
-
             *(x.finish) = {{x.start, f}, {S_LAMBDA, S_LAMBDA}};
         } else {
             if (!in_alphabet[u8(token)])
