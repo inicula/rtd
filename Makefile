@@ -1,15 +1,30 @@
 CXX=g++
 CXXFLAGS=-std=c++20 -Os -fno-exceptions -fno-rtti -march=native -Wall -Wextra -Wpedantic -Wconversion
-LIBS=`pkg-config fmt libgvc --libs`
-OBJS=main.o
+LDFLAGS=`pkg-config fmt libgvc --libs`
 
-default: rtd
+SRC = main.cpp
+OBJ = ${SRC:.cpp=.o}
 
-rtd: $(OBJS)
-	$(CXX) $(CXXFLAGS) $^ -o rtd $(LIBS)
+all: options rtd
 
-main.o: main.cpp
-	$(CXX) -c $(CXXFLAGS) main.cpp
+options:
+	@echo rtd build options:
+	@echo "CXXFLAGS = ${CXXFLAGS}"
+	@echo "LDFLAGS  = ${LDFLAGS}"
+	@echo "CXX      = ${CXX}"
+
+.cpp.o:
+	${CXX} -c ${CXXFLAGS} $<
+
+${OBJ}: numtypes.hpp
+
+rtd: ${OBJ}
+	${CXX} -o $@ ${OBJ} ${LDFLAGS}
+
+format:
+	clang-format --verbose -i *.cpp *.hpp
 
 clean:
-	rm -rf *.o rtd
+	rm -f rtd ${OBJ}
+
+.PHONY: all options clean format
