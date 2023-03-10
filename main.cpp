@@ -4,25 +4,17 @@
 #include <string>
 #include <stack>
 #include <queue>
+#include <optional>
 #include "numtypes.hpp"
 
 /* Macros */
 #define S_LAMBDA '\0'
 #define OP_CONCAT '.'
-#define OP_OR '|'
+#define OP_UNION '|'
 #define OP_KLEENE '*'
 #define NUM_CHARS (1 << 8)
 
-/* Typedefs */
-using NodeId = u8;
-
 /* Enums */
-enum class NodeType : u8 {
-    START = 0,
-    REGULAR,
-    FINAL,
-};
-
 enum class TokenType : u8 {
     REGULAR = 0,
     OPERATOR,
@@ -33,12 +25,13 @@ enum class TokenType : u8 {
 
 /* Structs */
 struct Node {
-    NodeType type;
+    Node* neighbours[2] = {};
+    char symbols[2] = {};
 };
 
-struct Transition {
-    NodeId id;
-    char symbol;
+struct NFA {
+    Node* start;
+    Node* finish;
 };
 
 /* Globals */
@@ -47,16 +40,17 @@ static constexpr auto OP_PREC = []() {
     std::array<u8, NUM_CHARS> arr = {};
     arr[OP_KLEENE] = 3;
     arr[OP_CONCAT] = 2;
-    arr[OP_OR] = 1;
+    arr[OP_UNION] = 1;
 
     return arr;
 }();
-static std::vector<std::vector<Transition>> adj;
 
 /* Functions declarations */
 static TokenType type_of(char);
 static std::string add_concatenation_op(const std::string&);
-static std::pair<std::string, bool> get_postfix(const std::string&);
+static std::optional<std::string> get_postfix(const std::string&);
+static std::optional<Node*> get_nfa(const std::string&);
+static void free_nfa(Node*);
 
 /* Functions definitions  */
 TokenType
@@ -103,7 +97,7 @@ add_concatenation_op(const std::string& infix)
     return result;
 }
 
-std::pair<std::string, bool>
+std::optional<std::string>
 get_postfix(const std::string& infix)
 {
     /* Apply Dijkstra's 'shunting yard' algorithm */
@@ -142,25 +136,107 @@ get_postfix(const std::string& infix)
             }
 
             if (operators.empty() || type_of(operators.top()) != TokenType::LEFT_PAREN)
-                return std::make_pair("", false);
+                return std::nullopt;
 
             operators.pop();
             break;
         case TokenType::ERROR:
-            return std::make_pair("", false);
+            return std::nullopt;
         }
     }
 
     while (!operators.empty()) {
         auto op = operators.top();
         if (type_of(op) == TokenType::LEFT_PAREN)
-            return std::make_pair("", false);
+            return std::nullopt;
 
         postfix += op;
         operators.pop();
     }
 
-    return std::make_pair(postfix, true);
+    return postfix;
+}
+
+std::optional<Node*>
+get_nfa(const std::string& postfix)
+{
+    std::stack<NFA> nfa_components;
+    for (char token : postfix) {
+        Node *f, *q;
+
+        switch (token) {
+        case OP_CONCAT: {
+            if (nfa_components.size() < 2)
+                return std::nullopt;
+
+            auto y = nfa_components.top();
+            nfa_components.pop();
+            auto x = nfa_components.top();
+            nfa_components.pop();
+
+            *(x.finish) = {{y.start}, {S_LAMBDA}};
+
+            q = x.start;
+            f = y.finish;
+            break;
+        }
+        case OP_UNION: {
+            if (nfa_components.size() < 2)
+                return std::nullopt;
+
+            auto y = nfa_components.top();
+            nfa_components.pop();
+            auto x = nfa_components.top();
+            nfa_components.pop();
+
+            q = new Node{{x.start, y.start}, {S_LAMBDA, S_LAMBDA}};
+            f = new Node{};
+
+            *(x.finish) = {{f}, {S_LAMBDA}};
+            *(y.finish) = {{f}, {S_LAMBDA}};
+            break;
+        }
+        case OP_KLEENE: {
+            if (nfa_components.empty())
+                return std::nullopt;
+
+            auto x = nfa_components.top();
+            nfa_components.pop();
+
+            f = new Node{};
+            q = new Node{{x.start, f}, {S_LAMBDA, S_LAMBDA}};
+
+            *(x.finish) = {{x.start, f}, {S_LAMBDA, S_LAMBDA}};
+            break;
+        }
+        default: {
+            if (!in_alphabet[u8(token)])
+                return std::nullopt;
+
+            f = new Node{};
+            q = new Node{{f}, {token}};
+            break;
+        }
+        }
+
+        nfa_components.push({q, f});
+    }
+
+    if (nfa_components.empty())
+        return std::nullopt;
+
+    return nfa_components.top().start;
+}
+
+void
+free_nfa(Node* root)
+{
+    if (root) {
+        free_nfa(root->neighbours[0]);
+        free_nfa(root->neighbours[1]);
+    }
+
+    delete root;
 }
 
 int
@@ -168,7 +244,7 @@ main(const int argc, const char* argv[])
 {
     /* TODO: Take as input a string to be validated with the DFA. */
     if (argc != 2) {
-        fmt::print(stderr, "reg-to-nfa <regex>\n");
+        fmt::print(stderr, "Usage: reg-to-nfa <regex>\n");
         return EXIT_FAILURE;
     }
 
@@ -177,17 +253,26 @@ main(const int argc, const char* argv[])
      *  TODO: Accept arbitrary ASCII alphabet.
      */
     for (char i = 'a'; i <= 'z'; ++i)
-        in_alphabet[usize(i)] = true;
+        in_alphabet[u8(i)] = true;
 
     const char* infix = argv[1];
     const auto with_concat_op = add_concatenation_op(infix);
-    const auto [postfix, ok] = get_postfix(with_concat_op);
-    if (ok) {
+    const auto postfix = get_postfix(with_concat_op);
+    if (postfix) {
         fmt::print("Infix: {}\nWith explicit concat: {}\nPostfix: {}\n",
                    infix,
                    with_concat_op,
-                   postfix);
+                   *postfix);
     } else {
-        fmt::print("Regex '{}' is invalid\n", infix);
+        fmt::print(stderr, "Regex '{}' is invalid\n", infix);
+        return EXIT_FAILURE;
+    }
+
+    auto root = get_nfa(*postfix);
+    if (root) {
+        free_nfa(*root);
+    } else {
+        fmt::print(stderr, "Failed to make NFA from regex\n");
+        return EXIT_FAILURE;
     }
 }
