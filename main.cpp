@@ -298,14 +298,14 @@ main(const int argc, const char* argv[])
     }
 
     auto root = get_nfa(*postfix);
-    if (root) {
-        get_nodes(*root, nodes);
-        make_graph("graph.dot");
-
-        for (NFANode* node : nodes)
-            delete node;
-    } else {
+    if (!root) {
         fmt::print(stderr, "Failed to make NFA from regex\n");
         return EXIT_FAILURE;
     }
+
+    get_nodes(*root, nodes);
+    make_graph("graph.dot");
+
+    for (NFANode* node : nodes)
+        delete node;
 }
