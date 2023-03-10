@@ -1,8 +1,8 @@
-# Regex to DFA
+# rtd
 
-Minimalistic regular expression to DFA conversion using Dijkstra's 'shunting yard' algorithm, followed by
-Thompson's construction algorithm, followed by the powerset construction
-algorithm.
+Minimalistic regular expression to DFA conversion using Dijkstra's 'shunting
+yard' algorithm, followed by Thompson's construction algorithm, followed by the
+powerset construction algorithm.
 
 ## Operators
 
@@ -26,8 +26,8 @@ $ sudo apt install libfmt-dev libgraphviz-dev
 To clone and build the program, run:
 
 ```bash
-$ git clone https://github.com/niculaionut/regex-to-dfa.git
-$ cd regex-to-dfa
+$ git clone https://github.com/niculaionut/rtd.git
+$ cd rtd
 $ make
 ```
 
