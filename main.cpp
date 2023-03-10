@@ -228,7 +228,7 @@ main(const int argc, const char* argv[])
 {
     /* TODO: Take as input a string to be validated with the DFA. */
     if (argc != 2) {
-        fmt::print(stderr, "Usage: reg-to-nfa <regex>\n");
+        fmt::print(stderr, "Usage: rtd <regex>\n");
         return EXIT_FAILURE;
     }
 
