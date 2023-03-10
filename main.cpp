@@ -165,8 +165,7 @@ get_nfa(const std::string& postfix)
     for (char token : postfix) {
         Node *q, *f;
 
-        switch (token) {
-        case OP_CONCAT: {
+        if (token == OP_CONCAT || token == OP_UNION) {
             if (nfa_components.size() < 2)
                 return std::nullopt;
 
@@ -175,29 +174,19 @@ get_nfa(const std::string& postfix)
             auto x = nfa_components.top();
             nfa_components.pop();
 
-            *(x.finish) = {{y.start}, {S_LAMBDA}};
+            if (token == OP_CONCAT) {
+                *(x.finish) = {{y.start}, {S_LAMBDA}};
 
-            q = x.start;
-            f = y.finish;
-            break;
-        }
-        case OP_UNION: {
-            if (nfa_components.size() < 2)
-                return std::nullopt;
+                q = x.start;
+                f = y.finish;
+            } else {
+                q = new Node{{x.start, y.start}, {S_LAMBDA, S_LAMBDA}};
+                f = new Node{};
 
-            auto y = nfa_components.top();
-            nfa_components.pop();
-            auto x = nfa_components.top();
-            nfa_components.pop();
-
-            q = new Node{{x.start, y.start}, {S_LAMBDA, S_LAMBDA}};
-            f = new Node{};
-
-            *(x.finish) = {{f}, {S_LAMBDA}};
-            *(y.finish) = {{f}, {S_LAMBDA}};
-            break;
-        }
-        case OP_KLEENE: {
+                *(x.finish) = {{f}, {S_LAMBDA}};
+                *(y.finish) = {{f}, {S_LAMBDA}};
+            }
+        } else if (token == OP_KLEENE) {
             if (nfa_components.empty())
                 return std::nullopt;
 
@@ -208,16 +197,12 @@ get_nfa(const std::string& postfix)
             q = new Node{{x.start, f}, {S_LAMBDA, S_LAMBDA}};
 
             *(x.finish) = {{x.start, f}, {S_LAMBDA, S_LAMBDA}};
-            break;
-        }
-        default: {
+        } else {
             if (!in_alphabet[u8(token)])
                 return std::nullopt;
 
             f = new Node{};
             q = new Node{{f}, {token}};
-            break;
-        }
         }
 
         nfa_components.push({q, f});
