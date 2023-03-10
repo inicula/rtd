@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS=-std=c++20 -Os -Wall -Wextra -Wpedantic -Werror
+CXXFLAGS=-std=c++20 -Os -fno-exceptions -fno-rtti -march=native -Wall -Wextra -Wpedantic -Werror
 LIBS=-lfmt
 OBJS=main.o
 
