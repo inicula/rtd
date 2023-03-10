@@ -2,3 +2,5 @@ rtd
 a.out
 *.o
 .clangd
+.cache
+compile_commands.json
