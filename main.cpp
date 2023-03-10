@@ -237,9 +237,8 @@ get_nodes(NFANode* root, std::vector<NFANode*>& nodes)
 void
 make_graph(const char* path)
 {
-    char gname[] = "g";
     GVC_t* gvc = gvContext();
-    Agraph_t* g = agopen(gname, Agdirected, 0);
+    Agraph_t* g = agopen((char*)"g", Agdirected, 0);
 
     char name[] = "a";
     std::vector<Agnode_t*> gvc_nodes(nodes.size(), nullptr);

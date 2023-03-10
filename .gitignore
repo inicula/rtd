@@ -4,3 +4,4 @@ a.out
 .clangd
 .cache
 compile_commands.json
+graph.dot
