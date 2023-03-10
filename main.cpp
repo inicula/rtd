@@ -194,12 +194,11 @@ get_nfa(const std::string& postfix)
             f = new Node{};
             q = new Node{{x.start, f}, {S_LAMBDA, S_LAMBDA}};
             *(x.finish) = {{x.start, f}, {S_LAMBDA, S_LAMBDA}};
-        } else {
-            if (!in_alphabet[u8(token)])
-                return std::nullopt;
-
+        } else if (in_alphabet[u8(token)]) {
             f = new Node{};
             q = new Node{{f}, {token}};
+        } else {
+            return std::nullopt;
         }
 
         nfa_components.push({q, f});
