@@ -1,4 +1,5 @@
 #include <fmt/core.h>
+#include <graphviz/gvc.h>
 #include <array>
 #include <vector>
 #include <string>
@@ -24,19 +25,20 @@ enum class TokenType : u8 {
 };
 
 /* Structs */
-struct Node {
-    Node* neighbours[2] = {};
+struct NFANode {
+    NFANode* neighbours[2] = {};
     char symbols[2] = {};
     bool visited = {};
 };
 
-struct NFA {
-    Node* start;
-    Node* finish;
+struct NFAFragment {
+    NFANode* start;
+    NFANode* finish;
 };
 
 /* Globals */
 static bool in_alphabet[NUM_CHARS] = {};
+static std::vector<NFANode*> nodes;
 static constexpr auto OP_PREC = []() {
     std::array<u8, NUM_CHARS> arr = {};
     arr[OP_KLEENE] = 3;
@@ -50,8 +52,8 @@ static constexpr auto OP_PREC = []() {
 static TokenType type_of(char);
 static std::string add_concatenation_op(const std::string&);
 static std::optional<std::string> get_postfix(const std::string&);
-static std::optional<Node*> get_nfa(const std::string&);
-static void get_nodes(Node*, std::vector<Node*>&);
+static std::optional<NFANode*> get_nfa(const std::string&);
+static void get_nodes(NFANode*, std::vector<NFANode*>&);
 
 /* Functions definitions  */
 TokenType
@@ -158,12 +160,12 @@ get_postfix(const std::string& infix)
     return postfix;
 }
 
-std::optional<Node*>
+std::optional<NFANode*>
 get_nfa(const std::string& postfix)
 {
-    std::stack<NFA> nfa_components;
+    std::stack<NFAFragment> nfa_components;
     for (char token : postfix) {
-        Node *q, *f;
+        NFANode *q, *f;
 
         if (token == OP_CONCAT || token == OP_UNION) {
             if (nfa_components.size() < 2)
@@ -179,8 +181,8 @@ get_nfa(const std::string& postfix)
                 q = x.start;
                 f = y.finish;
             } else {
-                q = new Node{{x.start, y.start}, {S_LAMBDA, S_LAMBDA}};
-                f = new Node{};
+                q = new NFANode{{x.start, y.start}, {S_LAMBDA, S_LAMBDA}};
+                f = new NFANode{};
                 *(x.finish) = {{f}, {S_LAMBDA}};
                 *(y.finish) = {{f}, {S_LAMBDA}};
             }
@@ -191,12 +193,12 @@ get_nfa(const std::string& postfix)
             auto x = nfa_components.top();
             nfa_components.pop();
 
-            f = new Node{};
-            q = new Node{{x.start, f}, {S_LAMBDA, S_LAMBDA}};
+            f = new NFANode{};
+            q = new NFANode{{x.start, f}, {S_LAMBDA, S_LAMBDA}};
             *(x.finish) = {{x.start, f}, {S_LAMBDA, S_LAMBDA}};
         } else if (in_alphabet[u8(token)]) {
-            f = new Node{};
-            q = new Node{{f}, {token}};
+            f = new NFANode{};
+            q = new NFANode{{f}, {token}};
         } else {
             return std::nullopt;
         }
@@ -211,7 +213,7 @@ get_nfa(const std::string& postfix)
 }
 
 void
-get_nodes(Node* root, std::vector<Node*>& nodes)
+get_nodes(NFANode* root, std::vector<NFANode*>& nodes)
 {
     if (!root || root->visited)
         return;
@@ -254,10 +256,9 @@ main(const int argc, const char* argv[])
 
     auto root = get_nfa(*postfix);
     if (root) {
-        std::vector<Node*> nodes;
         get_nodes(*root, nodes);
 
-        for (Node* node : nodes)
+        for (NFANode* node : nodes)
             delete node;
     } else {
         fmt::print(stderr, "Failed to make NFA from regex\n");
