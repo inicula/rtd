@@ -27,6 +27,7 @@ enum class TokenType : u8 {
 struct Node {
     Node* neighbours[2] = {};
     char symbols[2] = {};
+    bool visited = {};
 };
 
 struct NFA {
@@ -50,7 +51,7 @@ static TokenType type_of(char);
 static std::string add_concatenation_op(const std::string&);
 static std::optional<std::string> get_postfix(const std::string&);
 static std::optional<Node*> get_nfa(const std::string&);
-static void free_nfa(Node*);
+static void get_nodes(Node*, std::vector<Node*>&);
 
 /* Functions definitions  */
 TokenType
@@ -162,7 +163,7 @@ get_nfa(const std::string& postfix)
 {
     std::stack<NFA> nfa_components;
     for (char token : postfix) {
-        Node *f, *q;
+        Node *q, *f;
 
         switch (token) {
         case OP_CONCAT: {
@@ -229,14 +230,16 @@ get_nfa(const std::string& postfix)
 }
 
 void
-free_nfa(Node* root)
+get_nodes(Node* root, std::vector<Node*>& nodes)
 {
-    if (root) {
-        free_nfa(root->neighbours[0]);
-        free_nfa(root->neighbours[1]);
-    }
+    if (!root || root->visited)
+        return;
 
-    delete root;
+    root->visited = true;
+    nodes.push_back(root);
+
+    get_nodes(root->neighbours[0], nodes);
+    get_nodes(root->neighbours[1], nodes);
 }
 
 int
@@ -270,7 +273,11 @@ main(const int argc, const char* argv[])
 
     auto root = get_nfa(*postfix);
     if (root) {
-        free_nfa(*root);
+        std::vector<Node*> nodes;
+        get_nodes(*root, nodes);
+
+        for (Node* node : nodes)
+            delete node;
     } else {
         fmt::print(stderr, "Failed to make NFA from regex\n");
         return EXIT_FAILURE;
