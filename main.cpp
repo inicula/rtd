@@ -80,13 +80,12 @@ get_postfix(const std::string& infix)
     /* Apply the Dijkstra's 'shunting yard' algorithm */
 
     /* TODO: Treat the concatenation operator implicitly. */
-    std::string output = "";
+    std::string postfix = "";
     std::stack<char> operators;
     for (char token : infix) {
-        const auto type = type_of(token);
-        switch (type) {
+        switch (type_of(token)) {
         case TokenType::REGULAR:
-            output += token;
+            postfix += token;
             break;
         case TokenType::OPERATOR:
             for (;;) {
@@ -99,7 +98,7 @@ get_postfix(const std::string& infix)
                 if (OP_PREC[u8(top)] < OP_PREC[u8(token)])
                     break;
 
-                output += top;
+                postfix += top;
                 operators.pop();
             }
 
@@ -110,7 +109,7 @@ get_postfix(const std::string& infix)
             break;
         case TokenType::RIGHT_PAREN:
             while (!operators.empty() && type_of(operators.top()) != TokenType::LEFT_PAREN) {
-                output += operators.top();
+                postfix += operators.top();
                 operators.pop();
             }
 
@@ -129,11 +128,11 @@ get_postfix(const std::string& infix)
         if (type_of(op) == TokenType::LEFT_PAREN)
             return std::make_pair("", false);
 
-        output += op;
+        postfix += op;
         operators.pop();
     }
 
-    return std::make_pair(output, true);
+    return std::make_pair(postfix, true);
 }
 
 int
