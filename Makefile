@@ -1,6 +1,6 @@
 CXX=g++
-CXXFLAGS=-std=c++20 -Os -fno-exceptions -fno-rtti -march=native -Wall -Wextra -Wpedantic -Wconversion
-LDFLAGS=`pkg-config fmt libgvc --libs`
+CXXFLAGS=-std=c++20 -Os -flto -fno-exceptions -fno-rtti -march=native -Wall -Wextra -Wpedantic -Wconversion
+LDFLAGS=`pkg-config fmt libgvc --libs` -flto
 
 SRC = main.cpp
 OBJ = ${SRC:.cpp=.o}
