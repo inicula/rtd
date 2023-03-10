@@ -1,3 +1,4 @@
 rtd
 a.out
 *.o
+.clangd
