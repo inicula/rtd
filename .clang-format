@@ -2,6 +2,7 @@
 AlwaysBreakAfterDefinitionReturnType: 'true'
 AlignOperands: 'true'
 AllowAllConstructorInitializersOnNextLine: 'false'
+AllowAllArgumentsOnNextLine: 'false'
 AlwaysBreakTemplateDeclarations: 'Yes'
 BreakBeforeBraces: Linux
 BreakConstructorInitializers: BeforeComma

@@ -287,15 +287,15 @@ main(const int argc, const char* argv[])
     const char* infix = argv[1];
     const auto with_concat_op = add_concatenation_op(infix);
     const auto postfix = get_postfix(with_concat_op);
-    if (postfix) {
-        fmt::print("Infix: {}\nWith explicit concat: {}\nPostfix: {}\n",
-                   infix,
-                   with_concat_op,
-                   *postfix);
-    } else {
+    if (!postfix) {
         fmt::print(stderr, "Regex '{}' is invalid\n", infix);
         return EXIT_FAILURE;
     }
+
+    fmt::print("Infix: {}\nWith explicit concatenation operator: {}\nPostfix: {}\n",
+               infix,
+               with_concat_op,
+               *postfix);
 
     auto root = get_nfa(*postfix);
     if (!root) {
