@@ -106,7 +106,7 @@ add_concatenation_op(const std::string& infix)
 std::pair<std::string, bool>
 get_postfix(const std::string& infix)
 {
-    /* Apply the Dijkstra's 'shunting yard' algorithm */
+    /* Apply Dijkstra's 'shunting yard' algorithm */
 
     std::string postfix = "";
     std::stack<char> operators;
