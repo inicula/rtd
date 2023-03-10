@@ -42,7 +42,7 @@ struct Transition {
 };
 
 /* Globals */
-static bool IN_ALPHABET[NUM_CHARS] = {};
+static bool in_alphabet[NUM_CHARS] = {};
 static constexpr auto OP_PREC = []() {
     std::array<u8, NUM_CHARS> arr = {};
     arr[OP_KLEENE] = 3;
@@ -64,7 +64,7 @@ type_of(char token)
 {
     auto token_idx = u8(token);
 
-    if (IN_ALPHABET[token_idx])
+    if (in_alphabet[token_idx])
         return TokenType::REGULAR;
     if (OP_PREC[token_idx])
         return TokenType::OPERATOR;
@@ -177,7 +177,7 @@ main(const int argc, const char* argv[])
      *  TODO: Accept arbitrary ASCII alphabet.
      */
     for (char i = 'a'; i != 'z'; ++i)
-        IN_ALPHABET[usize(i)] = true;
+        in_alphabet[usize(i)] = true;
 
     const char* infix = argv[1];
     const auto with_concat_op = add_concatenation_op(infix);
