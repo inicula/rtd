@@ -176,7 +176,7 @@ main(const int argc, const char* argv[])
      *  Assume the expression's alphabet consists of lowercase English letters.
      *  TODO: Accept arbitrary ASCII alphabet.
      */
-    for (char i = 'a'; i != 'z'; ++i)
+    for (char i = 'a'; i <= 'z'; ++i)
         in_alphabet[usize(i)] = true;
 
     const char* infix = argv[1];
