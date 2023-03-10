@@ -14,6 +14,7 @@ powerset construction algorithm.
 
 ### Dependencies:
 
+* C++17 compatible compiler;
 * [`fmt`](https://fmt.dev/latest/index.html);
 * [`graphviz`](https://graphviz.org/docs/library/);
 * `pkg-config`.
