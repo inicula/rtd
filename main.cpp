@@ -1,14 +1,14 @@
 #include <fmt/core.h>
+#include <array>
 #include <vector>
 #include <string>
-#include <unordered_map>
 #include <stack>
 #include <queue>
 #include "numtypes.hpp"
 
 /* Macros */
-#define C_LAMBDA '\0'
-#define OP_CONCAT '\0'
+#define S_LAMBDA '\0'
+#define OP_CONCAT '.'
 #define OP_OR '|'
 #define OP_KLEENE '*'
 #define NUM_CHARS (1 << 8)
@@ -55,6 +55,7 @@ static std::vector<std::vector<Transition>> adj;
 
 /* Functions declarations */
 static TokenType type_of(char);
+static std::string add_concatenation_op(const std::string&);
 static std::pair<std::string, bool> get_postfix(const std::string&);
 
 /* Functions definitions  */
@@ -74,12 +75,39 @@ type_of(char token)
     return TokenType::ERROR;
 }
 
+std::string
+add_concatenation_op(const std::string& infix)
+{
+    if (infix.empty())
+        return "";
+
+    std::string result = infix.substr(0, 1);
+    for (usize i = 1; i < infix.size(); ++i) {
+        const char a = infix[i - 1];
+        const char b = infix[i];
+        const auto t_a = type_of(a);
+        const auto t_b = type_of(b);
+
+        /* Cases where the concatenation operator needs to be added */
+        if ((t_a == TokenType::REGULAR && t_b == TokenType::REGULAR) ||
+            (t_a == TokenType::REGULAR && t_b == TokenType::LEFT_PAREN) ||
+            (a == OP_KLEENE && t_b == TokenType::REGULAR) ||
+            (a == OP_KLEENE && t_b == TokenType::LEFT_PAREN) ||
+            (t_a == TokenType::RIGHT_PAREN && t_b == TokenType::REGULAR) ||
+            (t_a == TokenType::RIGHT_PAREN && t_b == TokenType::LEFT_PAREN))
+            result += OP_CONCAT;
+
+        result += b;
+    }
+
+    return result;
+}
+
 std::pair<std::string, bool>
 get_postfix(const std::string& infix)
 {
     /* Apply the Dijkstra's 'shunting yard' algorithm */
 
-    /* TODO: Treat the concatenation operator implicitly. */
     std::string postfix = "";
     std::stack<char> operators;
     for (char token : infix) {
@@ -138,7 +166,7 @@ get_postfix(const std::string& infix)
 int
 main(const int argc, const char* argv[])
 {
-    /* TODO: Accept a test string which will be validated using the DFA. */
+    /* TODO: Take as input a string to be validated with the DFA. */
     if (argc != 2) {
         fmt::print(stderr, "reg-to-nfa <regex>\n");
         return EXIT_FAILURE;
@@ -152,9 +180,14 @@ main(const int argc, const char* argv[])
         IN_ALPHABET[usize(i)] = true;
 
     const char* infix = argv[1];
-    const auto [postfix, ok] = get_postfix(infix);
-    if (ok)
-        fmt::print("Infix: {}\nPostfix: {}\n", infix, postfix);
-    else
+    const auto with_concat_op = add_concatenation_op(infix);
+    const auto [postfix, ok] = get_postfix(with_concat_op);
+    if (ok) {
+        fmt::print("Infix: {}\nWith explicit concat: {}\nPostfix: {}\n",
+                   infix,
+                   with_concat_op,
+                   postfix);
+    } else {
         fmt::print("Regex '{}' is invalid\n", infix);
+    }
 }
