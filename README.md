@@ -36,3 +36,4 @@ $ make
 * https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
 * https://en.wikipedia.org/wiki/Thompson%27s_construction
 * https://en.wikipedia.org/wiki/Powerset_construction
+* https://gitlab.com/graphviz/graphviz/-/blob/main/dot.demo/example.c
