@@ -17,6 +17,7 @@ powerset construction algorithm.
 ### Dependencies:
 
 * C++17 compatible compiler;
+* `make`;
 * [`fmt`](https://fmt.dev/latest/index.html);
 * [`graphviz`](https://graphviz.org/docs/library/);
 * `pkg-config`.
@@ -24,7 +25,7 @@ powerset construction algorithm.
 On Debian-based systems, they can usually be installed as follows:
 
 ```bash
-$ sudo apt install g++ pkg-config libfmt-dev libgraphviz-dev
+$ sudo apt install g++ make pkg-config libfmt-dev libgraphviz-dev
 ```
 
 To clone and build the program, run:
