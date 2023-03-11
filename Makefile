@@ -24,7 +24,10 @@ rtd: ${OBJ}
 format:
 	clang-format --verbose -i *.cpp *.hpp
 
+svg:
+	dot -Tsvg graph.dot >output.svg && ${BROWSER} output.svg
+
 clean:
 	rm -f rtd ${OBJ}
 
-.PHONY: all options clean format
+.PHONY: all options clean format svg
