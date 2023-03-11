@@ -28,6 +28,6 @@ svg:
 	dot -Tsvg graph.dot >output.svg && ${BROWSER} output.svg
 
 clean:
-	rm -f rtd ${OBJ}
+	rm -f rtd ${OBJ} graph.dot output.svg
 
 .PHONY: all options clean format svg
