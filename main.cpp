@@ -185,6 +185,8 @@ get_postfix(const std::string_view infix)
 std::optional<NFANode*>
 get_nfa(const std::string_view postfix)
 {
+    /* Apply Thompson's construction algorithm */
+
     std::stack<NFAFragment, std::vector<NFAFragment>> nfa_components;
     for (char token : postfix) {
         NFANode *q, *f;
