@@ -15,6 +15,8 @@
 #define OP_CONCAT  '.'
 #define OP_UNION   '|'
 #define OP_KLEENE  '*'
+#define OP_PLUS    '+'
+#define OP_OPT     '?'
 #define NUM_CHARS  (1 << 8)
 #define LAMBDA_UTF {char(0xce), char(0xbb)}
 /* clang-format on */
@@ -47,6 +49,8 @@ static std::vector<NFANode*> nodes;
 static constexpr auto OP_PREC = []() {
     std::array<u8, NUM_CHARS> arr = {};
     arr[OP_KLEENE] = 3;
+    arr[OP_PLUS] = 3;
+    arr[OP_OPT] = 3;
     arr[OP_CONCAT] = 2;
     arr[OP_UNION] = 1;
 
@@ -103,6 +107,10 @@ add_concatenation_op(const std::string_view infix)
             (t_a == TokenType::REGULAR && b == '(') ||
             (a == OP_KLEENE && t_b == TokenType::REGULAR) ||
             (a == OP_KLEENE && b == '(') ||
+            (a == OP_PLUS && t_b == TokenType::REGULAR) ||
+            (a == OP_PLUS && b == '(') ||
+            (a == OP_OPT && t_b == TokenType::REGULAR) ||
+            (a == OP_OPT && b == '(') ||
             (a == ')' && t_b == TokenType::REGULAR) ||
             (a == ')' && b == '('))
             result += OP_CONCAT;
@@ -200,16 +208,29 @@ get_nfa(const std::string_view postfix)
                 *(x.finish) = {{f}, {S_LAMBDA}};
                 *(y.finish) = {{f}, {S_LAMBDA}};
             }
-        } else if (token == OP_KLEENE) {
+        } else if (token == OP_KLEENE || token == OP_PLUS || token == OP_OPT) {
             if (nfa_components.empty())
                 return std::nullopt;
 
             auto x = nfa_components.top();
             nfa_components.pop();
 
-            f = new NFANode{};
-            q = new NFANode{{x.start, f}, {S_LAMBDA, S_LAMBDA}};
-            *(x.finish) = {{x.start, f}, {S_LAMBDA, S_LAMBDA}};
+            f = new NFANode;
+            q = new NFANode;
+
+            if (token == OP_KLEENE) {
+                *f = NFANode{};
+                *q = NFANode{{x.start, f}, {S_LAMBDA, S_LAMBDA}};
+                *(x.finish) = {{x.start, f}, {S_LAMBDA, S_LAMBDA}};
+            } else if (token == OP_PLUS) {
+                *f = NFANode{};
+                *q = NFANode{{x.start}, {S_LAMBDA}};
+                *(x.finish) = {{x.start, f}, {S_LAMBDA, S_LAMBDA}};
+            } else {
+                *f = NFANode{};
+                *q = NFANode{{x.start, f}, {S_LAMBDA, S_LAMBDA}};
+                *(x.finish) = {{f}, {S_LAMBDA}};
+            }
         } else {
             f = new NFANode{};
             q = new NFANode{{f}, {token}};

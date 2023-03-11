@@ -6,9 +6,11 @@ powerset construction algorithm.
 
 ## Operators
 
-* `|` - union;
-* `*` - Kleene star;
-* concatenation (implicit).
+* `<s1>|<s2>` - Matches either the subexpression `<s1>` or `<s2>`;
+* `<s1><s2>` - Matches the subexpression `<s1>` concatenated with `<s2>`;
+* `<s>*` - Matches zero or more occurrences of `<s>`;
+* `<s>+` - Matches one or more occurrences of `<s>`;
+* `<s>?` - Matches zero or one occurance of `<s>`.
 
 ## Building
 
