@@ -208,11 +208,9 @@ get_nfa(const std::string_view postfix)
             f = new NFANode{};
             q = new NFANode{{x.start, f}, {S_LAMBDA, S_LAMBDA}};
             *(x.finish) = {{x.start, f}, {S_LAMBDA, S_LAMBDA}};
-        } else if (in_alphabet[u8(token)]) {
+        } else {
             f = new NFANode{};
             q = new NFANode{{f}, {token}};
-        } else {
-            return std::nullopt;
         }
 
         nfa_components.push({q, f});
@@ -262,8 +260,8 @@ make_graph(const char* path)
                 label = LAMBDA_UTF;
 
             if (dest) {
-                auto e = agedge(g, gvc_nodes[src->id], gvc_nodes[dest->id], nullptr, 1);
-                agsafeset(e, (char*)"label", label.data(), (char*)"");
+                auto edge = agedge(g, gvc_nodes[src->id], gvc_nodes[dest->id], nullptr, 1);
+                agsafeset(edge, (char*)"label", label.data(), (char*)"");
             }
         }
     }
@@ -306,7 +304,7 @@ main(const int argc, const char* argv[])
         return EXIT_FAILURE;
     }
 
-    fmt::print("Infix: {}\nWith explicit concatenation operator: {}\nPostfix: {}\n",
+    fmt::print("Infix: {}\nInfix with explicit concatenation operator: {}\nPostfix: {}\n",
                infix,
                with_concat_op,
                *postfix);
