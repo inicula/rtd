@@ -98,13 +98,15 @@ add_concatenation_op(const std::string_view infix)
         const auto t_b = type_of(b);
 
         /* Cases where the concatenation operator needs to be added */
+        /* clang-format off */
         if ((t_a == TokenType::REGULAR && t_b == TokenType::REGULAR) ||
-            (t_a == TokenType::REGULAR && t_b == TokenType::LEFT_PAREN) ||
+            (t_a == TokenType::REGULAR && b == '(') ||
             (a == OP_KLEENE && t_b == TokenType::REGULAR) ||
-            (a == OP_KLEENE && t_b == TokenType::LEFT_PAREN) ||
-            (t_a == TokenType::RIGHT_PAREN && t_b == TokenType::REGULAR) ||
-            (t_a == TokenType::RIGHT_PAREN && t_b == TokenType::LEFT_PAREN))
+            (a == OP_KLEENE && b == '(') ||
+            (a == ')' && t_b == TokenType::REGULAR) ||
+            (a == ')' && b == '('))
             result += OP_CONCAT;
+        /* clang-format on */
 
         result += b;
     }
@@ -130,7 +132,7 @@ get_postfix(const std::string_view infix)
                     break;
 
                 auto top = operators.top();
-                if (type_of(top) == TokenType::LEFT_PAREN)
+                if (top == '(')
                     break;
                 if (OP_PREC[u8(top)] < OP_PREC[u8(token)])
                     break;
@@ -145,12 +147,12 @@ get_postfix(const std::string_view infix)
             operators.push(token);
             break;
         case TokenType::RIGHT_PAREN:
-            while (!operators.empty() && type_of(operators.top()) != TokenType::LEFT_PAREN) {
+            while (!operators.empty() && operators.top() != '(') {
                 postfix += operators.top();
                 operators.pop();
             }
 
-            if (operators.empty() || type_of(operators.top()) != TokenType::LEFT_PAREN)
+            if (operators.empty() || operators.top() != '(')
                 return std::nullopt;
 
             operators.pop();
@@ -162,7 +164,7 @@ get_postfix(const std::string_view infix)
 
     while (!operators.empty()) {
         auto op = operators.top();
-        if (type_of(op) == TokenType::LEFT_PAREN)
+        if (op == '(')
             return std::nullopt;
 
         postfix += op;
