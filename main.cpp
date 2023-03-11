@@ -6,14 +6,18 @@
 #include <stack>
 #include <queue>
 #include <optional>
+#include <charconv>
 #include "numtypes.hpp"
 
 /* Macros */
-#define S_LAMBDA '\0'
-#define OP_CONCAT '.'
-#define OP_UNION '|'
-#define OP_KLEENE '*'
-#define NUM_CHARS (1 << 8)
+/* clang-format off */
+#define S_LAMBDA   '\0'
+#define OP_CONCAT  '.'
+#define OP_UNION   '|'
+#define OP_KLEENE  '*'
+#define NUM_CHARS  (1 << 8)
+#define LAMBDA_UTF {char(0xce), char(0xbb)}
+/* clang-format on */
 
 /* Enums */
 enum class TokenType : u8 {
@@ -52,16 +56,16 @@ static constexpr auto OP_PREC = []() {
 /* Functions declarations */
 static void fmt_perror(const char*);
 static TokenType type_of(char);
-static std::string add_concatenation_op(const std::string&);
-static std::optional<std::string> get_postfix(const std::string&);
-static std::optional<NFANode*> get_nfa(const std::string&);
+static std::string add_concatenation_op(const std::string_view);
+static std::optional<std::string> get_postfix(const std::string_view);
+static std::optional<NFANode*> get_nfa(const std::string_view);
 static void get_nodes(NFANode*, std::vector<NFANode*>&);
 
 /* Functions definitions  */
 void
 fmt_perror(const char* why)
 {
-    fmt::print("{}: {}\n", why, strerror(errno));
+    fmt::print(stderr, "{}: {}\n", why, strerror(errno));
 }
 
 TokenType
@@ -81,12 +85,12 @@ type_of(char token)
 }
 
 std::string
-add_concatenation_op(const std::string& infix)
+add_concatenation_op(const std::string_view infix)
 {
     if (infix.empty())
         return "";
 
-    std::string result = infix.substr(0, 1);
+    std::string result{infix.substr(0, 1)};
     for (usize i = 1; i < infix.size(); ++i) {
         const char a = infix[i - 1];
         const char b = infix[i];
@@ -109,12 +113,12 @@ add_concatenation_op(const std::string& infix)
 }
 
 std::optional<std::string>
-get_postfix(const std::string& infix)
+get_postfix(const std::string_view infix)
 {
     /* Apply Dijkstra's 'shunting yard' algorithm */
 
     std::string postfix = "";
-    std::stack<char> operators;
+    std::stack<char, std::vector<char>> operators;
     for (char token : infix) {
         switch (type_of(token)) {
         case TokenType::REGULAR:
@@ -169,9 +173,9 @@ get_postfix(const std::string& infix)
 }
 
 std::optional<NFANode*>
-get_nfa(const std::string& postfix)
+get_nfa(const std::string_view postfix)
 {
-    std::stack<NFAFragment> nfa_components;
+    std::stack<NFAFragment, std::vector<NFAFragment>> nfa_components;
     for (char token : postfix) {
         NFANode *q, *f;
 
@@ -240,19 +244,28 @@ make_graph(const char* path)
     GVC_t* gvc = gvContext();
     Agraph_t* g = agopen((char*)"g", Agdirected, 0);
 
-    char name[] = "a";
+    std::array<char, 8> label = {};
     std::vector<Agnode_t*> gvc_nodes(nodes.size(), nullptr);
     for (usize i = 0; i < nodes.size(); ++i) {
-        gvc_nodes[i] = agnode(g, name, 1);
-        if (++name[0] > 'z')
-            name[0] = 'a';
+        *std::to_chars(label.data(), label.data() + sizeof(label) - 1, i).ptr = '\0';
+        gvc_nodes[i] = agnode(g, label.data(), 1);
     }
 
     for (usize i = 0; i < nodes.size(); ++i) {
-        if (nodes[i]->neighbours[0])
-            agedge(g, gvc_nodes[i], gvc_nodes[nodes[i]->neighbours[0]->id], 0, 1);
-        if (nodes[i]->neighbours[1])
-            agedge(g, gvc_nodes[i], gvc_nodes[nodes[i]->neighbours[1]->id], 0, 1);
+        NFANode* src = nodes[i];
+
+        for (usize j = 0; j < std::size(src->neighbours); ++j) {
+            NFANode* dest = src->neighbours[j];
+
+            label = {src->symbols[j]};
+            if (label[0] == S_LAMBDA)
+                label = LAMBDA_UTF;
+
+            if (dest) {
+                auto e = agedge(g, gvc_nodes[src->id], gvc_nodes[dest->id], nullptr, 1);
+                agsafeset(e, (char*)"label", label.data(), (char*)"");
+            }
+        }
     }
 
     auto file = fopen(path, "w");
@@ -263,8 +276,10 @@ make_graph(const char* path)
 
     gvLayout(gvc, g, "dot");
     gvRender(gvc, g, "dot", file);
+
     gvFreeLayout(gvc, g);
     agclose(g);
+    fclose(file);
 }
 
 int
@@ -283,7 +298,7 @@ main(const int argc, const char* argv[])
     for (char i = 'a'; i <= 'z'; ++i)
         in_alphabet[u8(i)] = true;
 
-    const char* infix = argv[1];
+    const std::string_view infix = argv[1];
     const auto with_concat_op = add_concatenation_op(infix);
     const auto postfix = get_postfix(with_concat_op);
     if (!postfix) {
