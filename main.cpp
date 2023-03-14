@@ -11,16 +11,17 @@
 
 /* Macros */
 /* clang-format off */
-#define START_NODE_COLOR   ((char*) "turquoise")
-#define FINAL_NODE_COLOR   ((char*) "x11green")
-#define S_LAMBDA           '\0'
-#define OP_CONCAT          '.'
-#define OP_UNION           '|'
-#define OP_KLEENE          '*'
-#define OP_PLUS            '+'
-#define OP_OPT             '?'
-#define NUM_CHARS          (1 << 8)
-#define LAMBDA_UTF         {char(0xce), char(0xbb)}
+#define START_NODE_COLOR         ((char*) "turquoise")
+#define FINAL_NODE_COLOR         ((char*) "x11green")
+#define START_FINAL_NODE_COLOR   ((char*) "turquoise:x11green")
+#define S_LAMBDA                 '\0'
+#define OP_CONCAT                '.'
+#define OP_UNION                 '|'
+#define OP_KLEENE                '*'
+#define OP_PLUS                  '+'
+#define OP_OPT                   '?'
+#define NUM_CHARS                (1 << 8)
+#define LAMBDA_UTF               {char(0xce), char(0xbb)}
 /* clang-format on */
 
 /* Enums */
@@ -46,17 +47,6 @@ struct NFAFragment {
 };
 
 struct Transition {
-    bool
-    operator<(const Transition& rhs)
-    {
-        return std::tie(dest, symbol) < std::tie(rhs.dest, rhs.symbol);
-    }
-    bool
-    operator==(const Transition& rhs)
-    {
-        return std::tie(dest, symbol) == std::tie(rhs.dest, rhs.symbol);
-    }
-
     usize dest;
     char symbol;
 };
@@ -67,6 +57,7 @@ static std::vector<NFANode*> node_ptrs;
 static std::vector<std::vector<Transition>> adj;
 static std::vector<u8> visited;
 static std::vector<u8> is_final;
+static std::vector<u8> can_reach_finish;
 static u8 start_node;
 static usize num_nodes;
 static constexpr auto OP_PREC = []() {
@@ -81,17 +72,34 @@ static constexpr auto OP_PREC = []() {
 }();
 
 /* Functions declarations */
+static bool operator<(const Transition&, const Transition&);
+static bool operator==(const Transition&, const Transition&);
 static void fmt_perror(const char*);
 static TokenType type_of(char);
 static std::string add_concatenation_op(const std::string_view);
 static std::optional<std::string> get_postfix(const std::string_view);
 static std::optional<NFANode*> get_nfa(const std::string_view);
 static void fill_adj_list(NFANode*);
-static void transitive_closure_helper(usize, usize);
+static void transitive_closure_helper(usize, usize, std::vector<Transition>&);
 static void transitive_closure();
-static void make_graph(const char*);
+static void remove_lambdas();
+static void mark_dead_helper(usize);
+static void mark_dead();
+static void make_graph(const char*, const std::string&);
 
 /* Functions definitions  */
+bool
+operator<(const Transition& x, const Transition& y)
+{
+    return std::tie(x.dest, x.symbol) < std::tie(y.dest, y.symbol);
+}
+
+bool
+operator==(const Transition& x, const Transition& y)
+{
+    return std::tie(x.dest, x.symbol) == std::tie(y.dest, y.symbol);
+}
+
 void
 fmt_perror(const char* why)
 {
@@ -305,7 +313,7 @@ fill_adj_list(NFANode* src)
 }
 
 void
-transitive_closure_helper(usize from, usize src)
+transitive_closure_helper(usize from, usize src, std::vector<Transition>& to_add)
 {
     if (visited[src])
         return;
@@ -314,8 +322,11 @@ transitive_closure_helper(usize from, usize src)
 
     for (auto [dest, symbol] : adj[src]) {
         if (symbol == S_LAMBDA) {
-            adj[from].push_back({dest, symbol});
-            transitive_closure_helper(from, dest);
+            to_add.push_back({dest, symbol});
+            if (is_final[dest])
+                is_final[from] = true;
+
+            transitive_closure_helper(from, dest, to_add);
         }
     }
 }
@@ -323,46 +334,113 @@ transitive_closure_helper(usize from, usize src)
 void
 transitive_closure()
 {
+    std::vector<Transition> to_add;
     for (usize src = 0; src < adj.size(); ++src) {
+        to_add.clear();
         std::fill(visited.begin(), visited.end(), false);
-        transitive_closure_helper(src, src);
-    }
+        transitive_closure_helper(src, src, to_add);
 
-    for (auto& transitions : adj) {
-        std::sort(transitions.begin(), transitions.end());
-        transitions.erase(std::unique(transitions.begin(), transitions.end()),
-                          transitions.end());
+        adj[src].insert(adj[src].end(), to_add.begin(), to_add.end());
     }
 }
 
 void
-make_graph(const char* path)
+remove_lambdas()
+{
+    for (usize u = 0; u < num_nodes; ++u) {
+        std::vector<Transition> to_add;
+        for (auto [v, to_v] : adj[u]) {
+            if (to_v != S_LAMBDA)
+                continue;
+
+            for (auto [w, to_w] : adj[v]) {
+                if (to_w != S_LAMBDA)
+                    to_add.push_back({w, to_w});
+            }
+        }
+
+        adj[u].insert(adj[u].end(), to_add.begin(), to_add.end());
+    }
+
+    for (auto& node_transitions : adj) {
+        node_transitions.erase(std::partition(node_transitions.begin(),
+                                              node_transitions.end(),
+                                              [](auto& t) { return t.symbol != S_LAMBDA; }),
+                               node_transitions.end());
+        std::sort(node_transitions.begin(), node_transitions.end());
+        node_transitions.erase(std::unique(node_transitions.begin(), node_transitions.end()),
+                               node_transitions.end());
+    }
+}
+
+void
+mark_dead_helper(usize src)
+{
+    if (visited[src])
+        return;
+
+    visited[src] = true;
+
+    if (is_final[src])
+        can_reach_finish[src] |= 1;
+
+    for (auto [dest, symbol] : adj[src]) {
+        mark_dead_helper(dest);
+        can_reach_finish[src] |= can_reach_finish[dest];
+    }
+}
+
+void
+mark_dead()
+{
+    std::fill(visited.begin(), visited.end(), false);
+    std::fill(can_reach_finish.begin(), can_reach_finish.end(), false);
+    mark_dead_helper(start_node);
+}
+
+void
+make_graph(const char* path, const std::string& reg)
 {
     GVC_t* gvc = gvContext();
     Agraph_t* g = agopen((char*)"g", Agdirected, 0);
+    agsafeset(g, (char*)"label", (char*)reg.data(), (char*)"");
+    agsafeset(g, (char*)"fontname", (char*)"monospace", (char*)"");
 
     std::array<char, 4> label = {};
     std::vector<Agnode_t*> gvc_nodes(num_nodes, nullptr);
     for (usize src = 0; src < num_nodes; ++src) {
-        *std::to_chars(label.data(), label.data() + sizeof(label) - 1, src + 1).ptr = '\0';
-        gvc_nodes[src] = agnode(g, label.data(), 1);
+        if (can_reach_finish[src]) {
+            *std::to_chars(label.data(), label.data() + sizeof(label) - 1, src + 1).ptr = '\0';
+            gvc_nodes[src] = agnode(g, label.data(), 1);
+            agsafeset(gvc_nodes[src], (char*)"fontname", (char*)"monospace", (char*)"");
+        }
     }
 
     for (usize src = 0; src < num_nodes; ++src) {
         for (auto [dest, symbol] : adj[src]) {
+            if (!can_reach_finish[src] || !can_reach_finish[dest])
+                continue;
+
             label = {symbol};
             if (label[0] == S_LAMBDA)
                 label = LAMBDA_UTF;
 
             auto edge = agedge(g, gvc_nodes[src], gvc_nodes[dest], nullptr, 1);
             agsafeset(edge, (char*)"label", label.data(), (char*)"");
+            agsafeset(edge, (char*)"fontname", (char*)"monospace", (char*)"");
         }
     }
 
-    agsafeset(gvc_nodes[start_node], (char*)"color", START_NODE_COLOR, (char*)"");
-    agsafeset(gvc_nodes[start_node], (char*)"style", (char*)"filled", (char*)"");
-    for (usize src = 0; src < num_nodes; ++src) {
-        if (is_final[src]) {
+    if (!is_final[start_node]) {
+        agsafeset(gvc_nodes[start_node], (char*)"color", START_NODE_COLOR, (char*)"");
+        agsafeset(gvc_nodes[start_node], (char*)"style", (char*)"filled", (char*)"");
+    } else {
+        agsafeset(gvc_nodes[start_node], (char*)"color", START_FINAL_NODE_COLOR, (char*)"");
+        agsafeset(gvc_nodes[start_node], (char*)"style", (char*)"wedged", (char*)"");
+    }
+
+    for (usize src = 1; src < num_nodes; ++src) {
+        if (can_reach_finish[src] && is_final[src]) {
             agsafeset(gvc_nodes[src], (char*)"color", FINAL_NODE_COLOR, (char*)"");
             agsafeset(gvc_nodes[src], (char*)"style", (char*)"filled", (char*)"");
         }
@@ -420,10 +498,14 @@ main(const int argc, const char* argv[])
     /* Fill the adjacency  matrix and save node ptrs */
     fill_adj_list(*root);
     visited.resize(num_nodes);
+    can_reach_finish.resize(num_nodes, true);
 
     /* No need for the old NFA representation anymore */
     for (NFANode* node : node_ptrs)
         delete node;
 
-    make_graph("graph.dot");
+    transitive_closure();
+    remove_lambdas();
+    mark_dead();
+    make_graph("graph.dot", "\n\n" + std::string(infix));
 }

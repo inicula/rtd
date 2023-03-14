@@ -27,6 +27,11 @@ format:
 svg:
 	dot -Tsvg graph.dot >output.svg && ${BROWSER} output.svg
 
+tests: options rtd
+	for filename in tests/*; do \
+			./rtd "$$(cat "$$filename")" && dot -Tsvg graph.dot >output.svg && ${BROWSER} output.svg ; \
+	done
+
 clean:
 	rm -f rtd ${OBJ} graph.dot output.svg
 
