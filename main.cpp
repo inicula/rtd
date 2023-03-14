@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 #include <stack>
-#include <queue>
+#include <algorithm>
 #include <optional>
 #include <charconv>
 #include "numtypes.hpp"
@@ -46,6 +46,17 @@ struct NFAFragment {
 };
 
 struct Transition {
+    bool
+    operator<(const Transition& rhs)
+    {
+        return std::tie(dest, symbol) < std::tie(rhs.dest, rhs.symbol);
+    }
+    bool
+    operator==(const Transition& rhs)
+    {
+        return std::tie(dest, symbol) == std::tie(rhs.dest, rhs.symbol);
+    }
+
     usize dest;
     char symbol;
 };
@@ -54,6 +65,7 @@ struct Transition {
 static bool in_alphabet[NUM_CHARS] = {};
 static std::vector<NFANode*> node_ptrs;
 static std::vector<std::vector<Transition>> adj;
+static std::vector<u8> visited;
 static std::vector<u8> is_final;
 static u8 start_node;
 static usize num_nodes;
@@ -75,6 +87,9 @@ static std::string add_concatenation_op(const std::string_view);
 static std::optional<std::string> get_postfix(const std::string_view);
 static std::optional<NFANode*> get_nfa(const std::string_view);
 static void fill_adj_list(NFANode*);
+static void transitive_closure_helper(usize, usize);
+static void transitive_closure();
+static void make_graph(const char*);
 
 /* Functions definitions  */
 void
@@ -290,6 +305,37 @@ fill_adj_list(NFANode* src)
 }
 
 void
+transitive_closure_helper(usize from, usize src)
+{
+    if (visited[src])
+        return;
+
+    visited[src] = true;
+
+    for (auto [dest, symbol] : adj[src]) {
+        if (symbol == S_LAMBDA) {
+            adj[from].push_back({dest, symbol});
+            transitive_closure_helper(from, dest);
+        }
+    }
+}
+
+void
+transitive_closure()
+{
+    for (usize src = 0; src < adj.size(); ++src) {
+        std::fill(visited.begin(), visited.end(), false);
+        transitive_closure_helper(src, src);
+    }
+
+    for (auto& transitions : adj) {
+        std::sort(transitions.begin(), transitions.end());
+        transitions.erase(std::unique(transitions.begin(), transitions.end()),
+                          transitions.end());
+    }
+}
+
+void
 make_graph(const char* path)
 {
     GVC_t* gvc = gvContext();
@@ -308,10 +354,8 @@ make_graph(const char* path)
             if (label[0] == S_LAMBDA)
                 label = LAMBDA_UTF;
 
-            if (dest) {
-                auto edge = agedge(g, gvc_nodes[src], gvc_nodes[dest], nullptr, 1);
-                agsafeset(edge, (char*)"label", label.data(), (char*)"");
-            }
+            auto edge = agedge(g, gvc_nodes[src], gvc_nodes[dest], nullptr, 1);
+            agsafeset(edge, (char*)"label", label.data(), (char*)"");
         }
     }
 
@@ -375,6 +419,7 @@ main(const int argc, const char* argv[])
 
     /* Fill the adjacency  matrix and save node ptrs */
     fill_adj_list(*root);
+    visited.resize(num_nodes);
 
     /* No need for the old NFA representation anymore */
     for (NFANode* node : node_ptrs)
