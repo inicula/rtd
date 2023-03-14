@@ -27,10 +27,16 @@ format:
 svg:
 	dot -Tsvg graph.dot >output.svg && ${BROWSER} output.svg
 
-tests: options rtd
+tests: build view
+
+build:
+	rm -f output/* ; \
 	for filename in tests/*; do \
-			./rtd "$$(cat "$$filename")" && dot -Tsvg graph.dot >output.svg && ${BROWSER} output.svg ; \
+			./rtd "$$(cat "$$filename")" && dot -Tsvg graph.dot >output/"$$(basename "$$filename")".svg ; \
 	done
+
+view:
+	${BROWSER} output/*
 
 clean:
 	rm -f rtd ${OBJ} graph.dot output.svg
