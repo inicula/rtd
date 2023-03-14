@@ -11,14 +11,16 @@
 
 /* Macros */
 /* clang-format off */
-#define S_LAMBDA   '\0'
-#define OP_CONCAT  '.'
-#define OP_UNION   '|'
-#define OP_KLEENE  '*'
-#define OP_PLUS    '+'
-#define OP_OPT     '?'
-#define NUM_CHARS  (1 << 8)
-#define LAMBDA_UTF {char(0xce), char(0xbb)}
+#define START_NODE_COLOR   ((char*) "turquoise")
+#define FINAL_NODE_COLOR   ((char*) "x11green")
+#define S_LAMBDA           '\0'
+#define OP_CONCAT          '.'
+#define OP_UNION           '|'
+#define OP_KLEENE          '*'
+#define OP_PLUS            '+'
+#define OP_OPT             '?'
+#define NUM_CHARS          (1 << 8)
+#define LAMBDA_UTF         {char(0xce), char(0xbb)}
 /* clang-format on */
 
 /* Enums */
@@ -53,7 +55,7 @@ static bool in_alphabet[NUM_CHARS] = {};
 static std::vector<NFANode*> node_ptrs;
 static std::vector<std::vector<Transition>> adj;
 static std::vector<u8> is_final;
-static u8 initial;
+static u8 start_node;
 static usize num_nodes;
 static constexpr auto OP_PREC = []() {
     std::array<u8, NUM_CHARS> arr = {};
@@ -313,10 +315,13 @@ make_graph(const char* path)
         }
     }
 
-    agsafeset(gvc_nodes[initial], (char*)"color", (char*)"blue", (char*)"");
+    agsafeset(gvc_nodes[start_node], (char*)"color", START_NODE_COLOR, (char*)"");
+    agsafeset(gvc_nodes[start_node], (char*)"style", (char*)"filled", (char*)"");
     for (usize src = 0; src < num_nodes; ++src) {
-        if (is_final[src])
-            agsafeset(gvc_nodes[src], (char*)"color", (char*)"red", (char*)"");
+        if (is_final[src]) {
+            agsafeset(gvc_nodes[src], (char*)"color", FINAL_NODE_COLOR, (char*)"");
+            agsafeset(gvc_nodes[src], (char*)"style", (char*)"filled", (char*)"");
+        }
     }
 
     auto file = fopen(path, "w");
