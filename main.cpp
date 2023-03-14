@@ -43,9 +43,18 @@ struct NFAFragment {
     NFANode* finish;
 };
 
+struct Transition {
+    usize dest;
+    char symbol;
+};
+
 /* Globals */
 static bool in_alphabet[NUM_CHARS] = {};
-static std::vector<NFANode*> nodes;
+static std::vector<NFANode*> node_ptrs;
+static std::vector<std::vector<Transition>> adj;
+static std::vector<u8> is_final;
+static u8 initial;
+static usize num_nodes;
 static constexpr auto OP_PREC = []() {
     std::array<u8, NUM_CHARS> arr = {};
     arr[OP_KLEENE] = 3;
@@ -63,7 +72,7 @@ static TokenType type_of(char);
 static std::string add_concatenation_op(const std::string_view);
 static std::optional<std::string> get_postfix(const std::string_view);
 static std::optional<NFANode*> get_nfa(const std::string_view);
-static void get_nodes(NFANode*, std::vector<NFANode*>&);
+static void fill_adj_list(NFANode*);
 
 /* Functions definitions  */
 void
@@ -248,17 +257,34 @@ get_nfa(const std::string_view postfix)
 }
 
 void
-get_nodes(NFANode* root, std::vector<NFANode*>& nodes)
+fill_adj_list(NFANode* src)
 {
-    if (!root || root->visited)
+    if (!src || src->visited)
         return;
 
-    root->visited = true;
-    root->id = nodes.size();
-    nodes.push_back(root);
+    node_ptrs.push_back(src);
 
-    get_nodes(root->neighbours[0], nodes);
-    get_nodes(root->neighbours[1], nodes);
+    src->visited = true;
+    src->id = num_nodes++;
+    while (src->id >= adj.size()) {
+        adj.push_back({});
+        is_final.push_back({});
+    }
+
+    auto v0 = src->neighbours[0];
+    auto v1 = src->neighbours[1];
+
+    is_final[src->id] = !v0 && !v1;
+
+    if (v0) {
+        fill_adj_list(v0);
+        adj[src->id].push_back({v0->id, src->symbols[0]});
+    }
+
+    if (v1) {
+        fill_adj_list(v1);
+        adj[src->id].push_back({v1->id, src->symbols[1]});
+    }
 }
 
 void
@@ -267,28 +293,30 @@ make_graph(const char* path)
     GVC_t* gvc = gvContext();
     Agraph_t* g = agopen((char*)"g", Agdirected, 0);
 
-    std::array<char, 8> label = {};
-    std::vector<Agnode_t*> gvc_nodes(nodes.size(), nullptr);
-    for (usize i = 0; i < nodes.size(); ++i) {
-        *std::to_chars(label.data(), label.data() + sizeof(label) - 1, i).ptr = '\0';
-        gvc_nodes[i] = agnode(g, label.data(), 1);
+    std::array<char, 4> label = {};
+    std::vector<Agnode_t*> gvc_nodes(num_nodes, nullptr);
+    for (usize src = 0; src < num_nodes; ++src) {
+        *std::to_chars(label.data(), label.data() + sizeof(label) - 1, src + 1).ptr = '\0';
+        gvc_nodes[src] = agnode(g, label.data(), 1);
     }
 
-    for (usize i = 0; i < nodes.size(); ++i) {
-        NFANode* src = nodes[i];
-
-        for (usize j = 0; j < std::size(src->neighbours); ++j) {
-            NFANode* dest = src->neighbours[j];
-
-            label = {src->symbols[j]};
+    for (usize src = 0; src < num_nodes; ++src) {
+        for (auto [dest, symbol] : adj[src]) {
+            label = {symbol};
             if (label[0] == S_LAMBDA)
                 label = LAMBDA_UTF;
 
             if (dest) {
-                auto edge = agedge(g, gvc_nodes[src->id], gvc_nodes[dest->id], nullptr, 1);
+                auto edge = agedge(g, gvc_nodes[src], gvc_nodes[dest], nullptr, 1);
                 agsafeset(edge, (char*)"label", label.data(), (char*)"");
             }
         }
+    }
+
+    agsafeset(gvc_nodes[initial], (char*)"color", (char*)"blue", (char*)"");
+    for (usize src = 0; src < num_nodes; ++src) {
+        if (is_final[src])
+            agsafeset(gvc_nodes[src], (char*)"color", (char*)"red", (char*)"");
     }
 
     auto file = fopen(path, "w");
@@ -340,9 +368,12 @@ main(const int argc, const char* argv[])
         return EXIT_FAILURE;
     }
 
-    get_nodes(*root, nodes);
-    make_graph("graph.dot");
+    /* Fill the adjacency  matrix and save node ptrs */
+    fill_adj_list(*root);
 
-    for (NFANode* node : nodes)
+    /* No need for the old NFA representation anymore */
+    for (NFANode* node : node_ptrs)
         delete node;
+
+    make_graph("graph.dot");
 }
