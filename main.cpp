@@ -12,19 +12,19 @@
 
 /* Macros */
 /* clang-format off */
-#define START_NODE_ID            0
-#define START_NODE_COLOR         "turquoise"
-#define FINAL_NODE_COLOR         "x11green"
-#define START_FINAL_NODE_COLOR   "turquoise:x11green"
-#define FONT                     "monospace"
-#define S_LAMBDA                 '\0'
-#define OP_CONCAT                '.'
-#define OP_UNION                 '|'
-#define OP_KLEENE                '*'
-#define OP_PLUS                  '+'
-#define OP_OPT                   '?'
-#define NUM_CHARS                (1 << 8)
-#define LAMBDA_UTF               {char(0xce), char(0xbb)}
+#define START_NODE_ID          0
+#define START_NODE_COLOR       "turquoise"
+#define FINAL_NODE_COLOR       "x11green"
+#define START_FINAL_NODE_COLOR "turquoise:x11green"
+#define FONT                   "monospace"
+#define S_LAMBDA               '\0'
+#define OP_CONCAT              '.'
+#define OP_UNION               '|'
+#define OP_KLEENE              '*'
+#define OP_PLUS                '+'
+#define OP_OPT                 '?'
+#define NUM_CHARS              (1 << 8)
+#define LAMBDA_UTF             {char(0xce), char(0xbb)}
 /* clang-format on */
 
 /* Enums */
