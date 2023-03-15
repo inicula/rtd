@@ -1,4 +1,3 @@
-#include <fmt/core.h>
 #include <graphviz/gvc.h>
 #include <array>
 #include <vector>
@@ -101,7 +100,6 @@ static constexpr auto OP_PREC = []() {
 /* Functions declarations */
 static bool operator<(const Transition&, const Transition&);
 static bool operator==(const Transition&, const Transition&);
-static void fmt_perror(const char*);
 static TokenType type_of(char);
 static std::string add_concatenation_op(const std::string_view);
 static std::optional<std::string> get_postfix(const std::string_view);
@@ -140,12 +138,6 @@ bool
 operator==(const Transition& x, const Transition& y)
 {
     return std::tie(x.dest, x.symbol) == std::tie(y.dest, y.symbol);
-}
-
-void
-fmt_perror(const char* why)
-{
-    fmt::print(stderr, "{}: {}\n", why, strerror(errno));
 }
 
 TokenType
@@ -526,7 +518,8 @@ remove_inactive_nodes(Graph& g)
 Graph
 to_dfa_graph(const Graph& nfa)
 {
-    usize next_id = 1;
+    static constexpr usize first_id = 1;
+    usize next_id = first_id;
     std::vector<Edge> edges;
     std::queue<std::unordered_set<usize>> queue;
     std::unordered_map<std::unordered_set<usize>, usize> ids;
@@ -586,9 +579,9 @@ to_dfa_graph(const Graph& nfa)
     for (auto src : finals)
         dfa.flags[src - 1] |= FINAL;
 
-    auto start_subset_id = ids.at({nfa.start});
-    dfa.flags[start_subset_id - 1] |= START;
-    dfa.start = start_subset_id - 1;
+    auto start_subset_id = first_id - 1;
+    dfa.flags[start_subset_id] |= START;
+    dfa.start = start_subset_id;
 
     return dfa;
 }
@@ -654,7 +647,7 @@ export_graph(const Graph& g, const char* output_path, const std::string& reg)
 
     auto file = fopen(output_path, "w");
     if (!file) {
-        fmt_perror("fopen");
+        perror("fopen");
         return;
     }
 
@@ -673,7 +666,7 @@ main(const int argc, const char* argv[])
 {
     /* TODO: Take as input a string to be validated with the DFA. */
     if (argc != 2) {
-        fmt::print(stderr, "Usage: rtd <regex>\n");
+        fprintf(stderr, "Usage: rtd <regex>\n");
         return EXIT_FAILURE;
     }
 
@@ -688,18 +681,18 @@ main(const int argc, const char* argv[])
     const auto with_concat_op = add_concatenation_op(infix);
     const auto postfix = get_postfix(with_concat_op);
     if (!postfix) {
-        fmt::print(stderr, "Regex '{}' is invalid\n", infix);
+        fprintf(stderr, "Regex %s is invalid\n", infix.data());
         return EXIT_FAILURE;
     }
 
-    fmt::print("Infix: {}\nInfix with explicit concatenation operator: {}\nPostfix: {}\n",
-               infix,
-               with_concat_op,
-               *postfix);
+    printf("Infix: %s\nInfix with explicit concatenation operator: %s\nPostfix: %s\n",
+           infix.data(),
+           with_concat_op.data(),
+           postfix->data());
 
     auto root = get_nfa(*postfix);
     if (!root) {
-        fmt::print(stderr, "Failed to make NFA from regex\n");
+        fprintf(stderr, "Failed to make NFA from regex\n");
         return EXIT_FAILURE;
     }
 
