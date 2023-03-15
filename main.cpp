@@ -527,7 +527,7 @@ main(const int argc, const char* argv[])
     for (NFANode* node : node_ptrs)
         delete node;
 
-    /* Transform λ-NFA to NFA without epsilon transitions and mark dead/unreachable states */
+    /* Transform λ-NFA to NFA without lambda-transitions and mark dead/unreachable states */
     transitive_closure();
     remove_lambdas();
     mark_dead();
