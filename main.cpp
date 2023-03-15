@@ -65,8 +65,8 @@ static bool in_alphabet[NUM_CHARS] = {};
 static std::vector<NFANode*> node_ptrs;
 static std::vector<std::vector<Transition>> adj;
 static std::vector<u8> visited;
-static std::vector<u8> is_final;
-static std::vector<u8> can_reach_finish;
+static std::vector<u8> is_final;  /* final[i] <=> node `i` represents a final state */
+static std::vector<u8> is_active; /* active[i] <=> node `i` is not DEAD and not UNREACHABLE */
 static u8 start_node;
 static usize num_nodes;
 static constexpr auto OP_PREC = []() {
@@ -92,8 +92,8 @@ static void fill_adj_list(NFANode*);
 static void transitive_closure_helper(usize, usize, std::vector<Transition>&);
 static void transitive_closure();
 static void remove_lambdas();
-static void mark_dead_helper(usize);
-static void mark_dead();
+static void mark_active_helper(usize);
+static void mark_active();
 static void set_attrs(void*, const AgobjAttrs&);
 static void make_graph(const char*, const std::string&);
 
@@ -384,7 +384,7 @@ remove_lambdas()
 }
 
 void
-mark_dead_helper(usize src)
+mark_active_helper(usize src)
 {
     if (visited[src])
         return;
@@ -392,20 +392,20 @@ mark_dead_helper(usize src)
     visited[src] = true;
 
     if (is_final[src])
-        can_reach_finish[src] |= 1;
+        is_active[src] |= 1;
 
     for (auto [dest, symbol] : adj[src]) {
-        mark_dead_helper(dest);
-        can_reach_finish[src] |= can_reach_finish[dest];
+        mark_active_helper(dest);
+        is_active[src] |= is_active[dest];
     }
 }
 
 void
-mark_dead()
+mark_active()
 {
     std::fill(visited.begin(), visited.end(), false);
-    std::fill(can_reach_finish.begin(), can_reach_finish.end(), false);
-    mark_dead_helper(start_node);
+    std::fill(is_active.begin(), is_active.end(), false);
+    mark_active_helper(start_node);
 }
 
 void
@@ -432,7 +432,7 @@ make_graph(const char* path, const std::string& reg)
     std::array<char, 4> lb = {};
     usize id = 0; /* Renumber states since we're ignoring dead ones */
     for (usize src = 0; src < num_nodes; ++src) {
-        if (can_reach_finish[src]) {
+        if (is_active[src]) {
             *std::to_chars(lb.data(), lb.data() + sizeof(lb) - 1, id++ + 1).ptr = '\0';
             g_nodes[src] = agnode(graph, lb.data(), 1);
             assert(g_nodes[src]);
@@ -442,7 +442,7 @@ make_graph(const char* path, const std::string& reg)
 
     for (usize src = 0; src < num_nodes; ++src) {
         for (auto [dest, symbol] : adj[src]) {
-            if (!can_reach_finish[src] || !can_reach_finish[dest])
+            if (!is_active[src] || !is_active[dest])
                 continue;
 
             lb = {symbol};
@@ -461,7 +461,7 @@ make_graph(const char* path, const std::string& reg)
         set_attrs(g_nodes[start_node], {.style = "wedged", .color = START_FINAL_NODE_COLOR});
 
     for (usize src = 1; src < num_nodes; ++src) {
-        if (can_reach_finish[src] && is_final[src])
+        if (is_active[src] && is_final[src])
             set_attrs(g_nodes[src], {.style = "filled", .color = FINAL_NODE_COLOR});
     }
 
@@ -521,16 +521,16 @@ main(const int argc, const char* argv[])
 
     /* Initialize some helper vectors for when they're used */
     visited.resize(num_nodes);
-    can_reach_finish.resize(num_nodes, true);
+    is_active.resize(num_nodes, true);
 
     /* No need for the old NFA representation anymore */
     for (NFANode* node : node_ptrs)
         delete node;
 
-    /* Transform λ-NFA to NFA without lambda-transitions and mark dead/unreachable states */
+    /* Transform λ-NFA to NFA without λ-transitions and mark active states */
     transitive_closure();
     remove_lambdas();
-    mark_dead();
+    mark_active();
 
     make_graph("graph.dot", "\n\n" + std::string(infix));
 }
