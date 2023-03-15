@@ -35,7 +35,7 @@ enum class TokenType : u8 {
     ERROR,
 };
 
-enum NodeFlag : u32 {
+enum GraphNodeFlag : u32 {
     VISITED = 1 << 0,
     FINAL   = 1 << 1,
     ACTIVE  = 1 << 2, /* Equivalent to: (not DEAD) && (not UNREACHABLE) */
