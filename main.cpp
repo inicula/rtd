@@ -1,3 +1,4 @@
+#include <getopt.h>
 #include <graphviz/gvc.h>
 #include <array>
 #include <vector>
@@ -15,6 +16,8 @@
 
 /* Macros */
 /* clang-format off */
+#define DEFAULT_ALPHABET    "abcdefghijklmnopqrstuvwxyz"
+#define ALL_ALPHANUMS       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
 #define START_UNINITIALIZED (usize(-1))
 #define START_COLOR         "turquoise"
 #define FINAL_COLOR         "x11green"
@@ -112,7 +115,8 @@ static void mark_active_nodes(usize, Graph&);
 static void remove_inactive_nodes(Graph&);
 static Graph to_dfa_graph(const Graph&);
 static void set_attrs(void*, const AgobjAttrs&);
-static void export_graph(const Graph&, const char*, const std::string&);
+static void export_graph(const Graph&, FILE*, const std::string&);
+static void usage();
 
 /* Functions definitions  */
 template<>
@@ -600,7 +604,7 @@ set_attrs(void* obj, const AgobjAttrs& attrs)
 }
 
 void
-export_graph(const Graph& g, const char* output_path, const std::string& reg)
+export_graph(const Graph& g, FILE* output_file, const std::string& reg)
 {
     const auto& [adj, flags, _] = g;
     const usize size = adj.size();
@@ -645,54 +649,102 @@ export_graph(const Graph& g, const char* output_path, const std::string& reg)
         }
     }
 
-    auto file = fopen(output_path, "w");
-    if (!file) {
-        perror("fopen");
-        return;
-    }
-
     GVC_t* context = gvContext();
     assert(context);
     gvLayout(context, graph, "dot");
-    gvRender(context, graph, "dot", file);
+    gvRender(context, graph, "dot", output_file);
 
     gvFreeLayout(context, graph);
     agclose(graph);
-    fclose(file);
+}
+
+void
+usage()
+{
+    fprintf(
+        stderr,
+        "%s\n",
+        "USAGE:\n"
+        "    rtd [FLAGS/OPTIONS] <regex>\n\n"
+        "FLAGS:\n"
+        "    -h\n"
+        "        Print help info.\n"
+        "    -a\n"
+        "        Set the alphabet of the regex as all alphanumericals.\n\n"
+        "OPTIONS:\n"
+        "    -s <alphabet>\n"
+        "        Set the alphabet of the regex (only alphanumericals allowed).\n"
+        "    -o <output_file>\n"
+        "        Set the path at which the graph file will be written (default is stdout).");
 }
 
 int
-main(const int argc, const char* argv[])
+main(const int argc, char* argv[])
 {
-    /* TODO: Take as input a string to be validated with the DFA. */
-    if (argc != 2) {
-        fprintf(stderr, "Usage: rtd <regex>\n");
+    const char* alphabet = DEFAULT_ALPHABET;
+    const char* output_path = nullptr;
+    bool all_alnum = false;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "has:o:")) != -1) {
+        switch (opt) {
+        case 'h':
+            usage();
+            return EXIT_FAILURE;
+        case 'a':
+            all_alnum = true;
+            break;
+        case 's':
+            alphabet = optarg;
+            break;
+        case 'o':
+            output_path = optarg;
+            break;
+        default:
+            usage();
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (all_alnum)
+        alphabet = ALL_ALPHANUMS;
+
+    if (optind >= argc) {
+        fprintf(stderr, "Missing <regex> argument\n\n");
+        usage();
         return EXIT_FAILURE;
     }
 
-    /*
-     *  Assume the expression's alphabet consists of lowercase English letters.
-     *  TODO: Accept arbitrary ASCII alphabet.
-     */
-    for (char i = 'a'; i <= 'z'; ++i)
-        in_alphabet[u8(i)] = true;
+    for (char c : std::string_view(alphabet)) {
+        if (!std::isalnum(c)) {
+            fprintf(stderr, "The alphabet can only contain alphanumericals\n");
+            return EXIT_FAILURE;
+        }
 
-    const std::string_view infix = argv[1];
+        in_alphabet[u8(c)] = true;
+    }
+
+    const std::string_view infix = argv[optind];
     const auto with_concat_op = add_concatenation_op(infix);
     const auto postfix = get_postfix(with_concat_op);
     if (!postfix) {
         fprintf(stderr, "Regex %s is invalid\n", infix.data());
+        usage();
         return EXIT_FAILURE;
     }
 
-    printf("Infix: %s\nInfix with explicit concatenation operator: %s\nPostfix: %s\n",
-           infix.data(),
-           with_concat_op.data(),
-           postfix->data());
+#ifdef RTD_DEBUG
+    fprintf(stderr,
+            "Infix: %s\nInfix with explicit concatenation operator: %s\nPostfix: %s\n",
+            infix.data(),
+            with_concat_op.data(),
+            postfix->data());
+#endif
 
     auto root = get_nfa(*postfix);
     if (!root) {
         fprintf(stderr, "Failed to make NFA from regex\n");
+        usage();
         return EXIT_FAILURE;
     }
 
@@ -707,5 +759,12 @@ main(const int argc, const char* argv[])
     remove_lambdas(nfa_graph);
 
     auto dfa_graph = to_dfa_graph(nfa_graph);
-    export_graph(dfa_graph, "graph.dot", "\n\n" + std::string(infix));
+
+    auto output_file = output_path ? fopen(output_path, "w") : stdout;
+    if (!output_file) {
+        perror("fopen");
+        return EXIT_FAILURE;
+    }
+
+    export_graph(dfa_graph, output_file, "\n\n" + std::string(infix));
 }
