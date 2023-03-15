@@ -21,6 +21,9 @@ ${OBJ}: numtypes.hpp
 rtd: ${OBJ}
 	${CXX} -o $@ ${OBJ} ${LDFLAGS}
 
+svg:
+	dot -Tsvg graph.dot >output.svg
+
 tests: rtd
 	rm -f output/*
 	for filename in tests/*; do \
@@ -30,4 +33,4 @@ tests: rtd
 clean:
 	rm -f rtd ${OBJ} graph.dot output.svg
 
-.PHONY: all options tests clean
+.PHONY: all options svg tests clean

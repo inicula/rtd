@@ -95,11 +95,11 @@ static std::string add_concatenation_op(const std::string_view);
 static std::optional<std::string> get_postfix(const std::string_view);
 static std::optional<NFANode*> get_nfa(const std::string_view);
 static Graph to_graph(NFANode*);
-static void transitive_closure_helper(usize, usize, std::vector<Transition>&, Graph&);
-static void transitive_closure(Graph&);
+static void add_transitive_closure_helper(usize, usize, std::vector<Transition>&, Graph&);
+static void add_transitive_closure(Graph&);
 static void remove_lambdas(Graph&);
-static void mark_active_helper(usize, Graph&);
-static void mark_active(Graph&);
+static void mark_active_nodes_helper(usize, Graph&);
+static void mark_active_nodes(Graph&);
 static void set_attrs(void*, const AgobjAttrs&);
 static void export_graph(const Graph&, const char*, const std::string&);
 
@@ -339,7 +339,7 @@ to_graph(NFANode* src)
 }
 
 void
-transitive_closure_helper(usize from, usize src, std::vector<Transition>& to_add, Graph& g)
+add_transitive_closure_helper(usize from, usize src, std::vector<Transition>& to_add, Graph& g)
 {
     auto& [adj, flags] = g;
 
@@ -353,13 +353,13 @@ transitive_closure_helper(usize from, usize src, std::vector<Transition>& to_add
             to_add.push_back({dest, symbol});
             flags[from] |= flags[dest] & FINAL;
 
-            transitive_closure_helper(from, dest, to_add, g);
+            add_transitive_closure_helper(from, dest, to_add, g);
         }
     }
 }
 
 void
-transitive_closure(Graph& g)
+add_transitive_closure(Graph& g)
 {
     auto& [adj, flags] = g;
 
@@ -367,7 +367,7 @@ transitive_closure(Graph& g)
     for (usize src = 0; src < adj.size(); ++src) {
         for (auto& f : flags)
             f &= ~VISITED;
-        transitive_closure_helper(src, src, to_add, g);
+        add_transitive_closure_helper(src, src, to_add, g);
 
         adj[src].insert(adj[src].end(), to_add.begin(), to_add.end());
         to_add.clear();
@@ -406,7 +406,7 @@ remove_lambdas(Graph& g)
 }
 
 void
-mark_active_helper(usize src, Graph& g)
+mark_active_nodes_helper(usize src, Graph& g)
 {
     auto& [adj, flags] = g;
 
@@ -419,18 +419,18 @@ mark_active_helper(usize src, Graph& g)
         flags[src] |= ACTIVE;
 
     for (auto [dest, symbol] : adj[src]) {
-        mark_active_helper(dest, g);
+        mark_active_nodes_helper(dest, g);
         flags[src] |= flags[dest] & ACTIVE;
     }
 }
 
 void
-mark_active(Graph& g)
+mark_active_nodes(Graph& g)
 {
     for (auto& f : g.flags)
         f &= ~(VISITED | ACTIVE);
 
-    mark_active_helper(START_NODE_ID, g);
+    mark_active_nodes_helper(START_NODE_ID, g);
 }
 
 void
@@ -553,9 +553,9 @@ main(const int argc, const char* argv[])
         delete node;
 
     /* Transform λ-NFA to NFA without λ-transitions and mark active states */
-    transitive_closure(graph);
+    add_transitive_closure(graph);
     remove_lambdas(graph);
-    mark_active(graph);
+    mark_active_nodes(graph);
 
     export_graph(graph, "graph.dot", "\n\n" + std::string(infix));
 }
