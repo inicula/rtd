@@ -323,7 +323,6 @@ to_graph_helper(NFANode* src, Graph& g)
         to_graph_helper(v0, g);
         adj[src->id].push_back({v0->id, src->symbols[0]});
     }
-
     if (v1) {
         to_graph_helper(v1, g);
         adj[src->id].push_back({v1->id, src->symbols[1]});
@@ -352,8 +351,7 @@ transitive_closure_helper(usize from, usize src, std::vector<Transition>& to_add
     for (auto [dest, symbol] : adj[src]) {
         if (symbol == S_LAMBDA) {
             to_add.push_back({dest, symbol});
-            if (flags[dest] & FINAL)
-                flags[from] |= FINAL;
+            flags[from] |= flags[dest] & FINAL;
 
             transitive_closure_helper(from, dest, to_add, g);
         }
