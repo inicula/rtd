@@ -27,7 +27,7 @@ format:
 svg:
 	dot -Tsvg graph.dot >output.svg && ${BROWSER} output.svg
 
-tests: build view
+tests: rtd build
 
 build:
 	rm -f output/* ; \

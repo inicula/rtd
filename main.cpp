@@ -406,12 +406,13 @@ make_graph(const char* path, const std::string& reg)
     agsafeset(g, (char*)"label", (char*)reg.data(), (char*)"");
     agsafeset(g, (char*)"fontname", (char*)"monospace", (char*)"");
 
-    std::array<char, 4> label = {};
+    usize id = 0; /* Renumber states since we're ignoring dead ones */
+    std::array<char, 4> lb = {};
     std::vector<Agnode_t*> gvc_nodes(num_nodes, nullptr);
     for (usize src = 0; src < num_nodes; ++src) {
         if (can_reach_finish[src]) {
-            *std::to_chars(label.data(), label.data() + sizeof(label) - 1, src + 1).ptr = '\0';
-            gvc_nodes[src] = agnode(g, label.data(), 1);
+            *std::to_chars(lb.data(), lb.data() + sizeof(lb) - 1, id++ + 1).ptr = '\0';
+            gvc_nodes[src] = agnode(g, lb.data(), 1);
             agsafeset(gvc_nodes[src], (char*)"fontname", (char*)"monospace", (char*)"");
         }
     }
@@ -421,12 +422,12 @@ make_graph(const char* path, const std::string& reg)
             if (!can_reach_finish[src] || !can_reach_finish[dest])
                 continue;
 
-            label = {symbol};
-            if (label[0] == S_LAMBDA)
-                label = LAMBDA_UTF;
+            lb = {symbol};
+            if (lb[0] == S_LAMBDA)
+                lb = LAMBDA_UTF;
 
             auto edge = agedge(g, gvc_nodes[src], gvc_nodes[dest], nullptr, 1);
-            agsafeset(edge, (char*)"label", label.data(), (char*)"");
+            agsafeset(edge, (char*)"label", lb.data(), (char*)"");
             agsafeset(edge, (char*)"fontname", (char*)"monospace", (char*)"");
         }
     }
