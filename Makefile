@@ -21,24 +21,13 @@ ${OBJ}: numtypes.hpp
 rtd: ${OBJ}
 	${CXX} -o $@ ${OBJ} ${LDFLAGS}
 
-format:
-	clang-format --verbose -i *.cpp *.hpp
-
-svg:
-	dot -Tsvg graph.dot >output.svg && ${BROWSER} output.svg
-
-tests: rtd build
-
-build:
-	rm -f output/* ; \
+tests: rtd
+	rm -f output/*
 	for filename in tests/*; do \
 			./rtd "$$(cat "$$filename")" && dot -Tsvg graph.dot >output/"$$(basename "$$filename")".svg ; \
 	done
 
-view:
-	${BROWSER} output/*
-
 clean:
 	rm -f rtd ${OBJ} graph.dot output.svg
 
-.PHONY: all options clean format svg
+.PHONY: all options tests clean
