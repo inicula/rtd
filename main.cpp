@@ -25,7 +25,6 @@
 #define OP_OPT                 '?'
 #define NUM_CHARS              (1 << 8)
 #define LAMBDA_UTF             {char(0xce), char(0xbb)}
-/* clang-format on */
 
 /* Enums */
 enum class TokenType : u8 {
@@ -35,6 +34,13 @@ enum class TokenType : u8 {
     RIGHT_PAREN,
     ERROR,
 };
+
+enum NodeFlag : u32 {
+    VISITED = 1 << 0,
+    FINAL   = 1 << 1,
+    ACTIVE  = 1 << 2, /* Equivalent to: (not DEAD) && (not UNREACHABLE) */
+};
+/* clang-format on */
 
 /* Structs */
 struct NFANode {
@@ -61,14 +67,14 @@ struct AgobjAttrs {
     const char* color = nullptr;
 };
 
+struct Graph {
+    std::vector<std::vector<Transition>> adj;
+    std::vector<u32> flags;
+};
+
 /* Globals */
 static bool in_alphabet[NUM_CHARS] = {};
 static std::vector<NFANode*> node_ptrs;
-static std::vector<std::vector<Transition>> adj;
-static std::vector<u8> visited;
-static std::vector<u8> is_final;  /* final[i] <=> node `i` represents a final state */
-static std::vector<u8> is_active; /* active[i] <=> node `i` is not DEAD and not UNREACHABLE */
-static usize num_nodes;
 static constexpr auto OP_PREC = []() {
     std::array<u8, NUM_CHARS> arr = {};
     arr[OP_KLEENE] = 3;
@@ -88,14 +94,14 @@ static TokenType type_of(char);
 static std::string add_concatenation_op(const std::string_view);
 static std::optional<std::string> get_postfix(const std::string_view);
 static std::optional<NFANode*> get_nfa(const std::string_view);
-static void fill_adj_list(NFANode*);
-static void transitive_closure_helper(usize, usize, std::vector<Transition>&);
-static void transitive_closure();
-static void remove_lambdas();
-static void mark_active_helper(usize);
-static void mark_active();
+static Graph to_graph(NFANode*);
+static void transitive_closure_helper(usize, usize, std::vector<Transition>&, Graph&);
+static void transitive_closure(Graph&);
+static void remove_lambdas(Graph&);
+static void mark_active_helper(usize, Graph&);
+static void mark_active(Graph&);
 static void set_attrs(void*, const AgobjAttrs&);
-static void export_graph(const char*, const std::string&);
+static void export_graph(const Graph&, const char*, const std::string&);
 
 /* Functions definitions  */
 bool
@@ -292,72 +298,90 @@ get_nfa(const std::string_view postfix)
 }
 
 void
-fill_adj_list(NFANode* src)
+to_graph_helper(NFANode* src, Graph& g)
 {
     if (!src || src->visited)
         return;
 
+    auto& [adj, flags] = g;
+
     node_ptrs.push_back(src);
 
     src->visited = true;
-    src->id = num_nodes++; /* Pre-order traversal, which is why `START_NODE_ID` is 0 */
+    src->id = adj.size(); /* Pre-order traversal, which is why `START_NODE_ID` is 0 */
     while (src->id >= adj.size()) {
         adj.push_back({});
-        is_final.push_back({});
+        flags.push_back({});
     }
 
     auto v0 = src->neighbours[0];
     auto v1 = src->neighbours[1];
 
-    is_final[src->id] = !v0 && !v1;
+    flags[src->id] |= FINAL * (!v0 && !v1);
 
     if (v0) {
-        fill_adj_list(v0);
+        to_graph_helper(v0, g);
         adj[src->id].push_back({v0->id, src->symbols[0]});
     }
 
     if (v1) {
-        fill_adj_list(v1);
+        to_graph_helper(v1, g);
         adj[src->id].push_back({v1->id, src->symbols[1]});
     }
 }
 
-void
-transitive_closure_helper(usize from, usize src, std::vector<Transition>& to_add)
+Graph
+to_graph(NFANode* src)
 {
-    if (visited[src])
+    Graph g = {};
+    to_graph_helper(src, g);
+
+    return g;
+}
+
+void
+transitive_closure_helper(usize from, usize src, std::vector<Transition>& to_add, Graph& g)
+{
+    auto& [adj, flags] = g;
+
+    if (flags[src] & VISITED)
         return;
 
-    visited[src] = true;
+    flags[src] |= VISITED;
 
     for (auto [dest, symbol] : adj[src]) {
         if (symbol == S_LAMBDA) {
             to_add.push_back({dest, symbol});
-            if (is_final[dest])
-                is_final[from] = true;
+            if (flags[dest] & FINAL)
+                flags[from] |= FINAL;
 
-            transitive_closure_helper(from, dest, to_add);
+            transitive_closure_helper(from, dest, to_add, g);
         }
     }
 }
 
 void
-transitive_closure()
+transitive_closure(Graph& g)
 {
+    auto& [adj, flags] = g;
+
     std::vector<Transition> to_add;
     for (usize src = 0; src < adj.size(); ++src) {
-        to_add.clear();
-        std::fill(visited.begin(), visited.end(), false);
-        transitive_closure_helper(src, src, to_add);
+        for (auto& f : flags)
+            f &= ~VISITED;
+        transitive_closure_helper(src, src, to_add, g);
 
         adj[src].insert(adj[src].end(), to_add.begin(), to_add.end());
+        to_add.clear();
     }
 }
 
 void
-remove_lambdas()
+remove_lambdas(Graph& g)
 {
-    for (usize u = 0; u < num_nodes; ++u) {
+    auto& adj = g.adj;
+
+    for (usize u = 0; u < adj.size(); ++u) {
         std::vector<Transition> to_add;
         for (auto [v, to_v] : adj[u]) {
             if (to_v != S_LAMBDA)
@@ -384,28 +408,31 @@ remove_lambdas()
 }
 
 void
-mark_active_helper(usize src)
+mark_active_helper(usize src, Graph& g)
 {
-    if (visited[src])
+    auto& [adj, flags] = g;
+
+    if (flags[src] & VISITED)
         return;
 
-    visited[src] = true;
+    flags[src] |= VISITED;
 
-    if (is_final[src])
-        is_active[src] |= 1;
+    if (flags[src] & FINAL)
+        flags[src] |= ACTIVE;
 
     for (auto [dest, symbol] : adj[src]) {
-        mark_active_helper(dest);
-        is_active[src] |= is_active[dest];
+        mark_active_helper(dest, g);
+        flags[src] |= flags[dest] & ACTIVE;
     }
 }
 
 void
-mark_active()
+mark_active(Graph& g)
 {
-    std::fill(visited.begin(), visited.end(), false);
-    std::fill(is_active.begin(), is_active.end(), false);
-    mark_active_helper(START_NODE_ID);
+    for (auto& f : g.flags)
+        f &= ~(VISITED | ACTIVE);
+
+    mark_active_helper(START_NODE_ID, g);
 }
 
 void
@@ -422,17 +449,20 @@ set_attrs(void* obj, const AgobjAttrs& attrs)
 }
 
 void
-export_graph(const char* output_path, const std::string& reg)
+export_graph(const Graph& g, const char* output_path, const std::string& reg)
 {
+    const auto& [adj, flags] = g;
+    const usize size = adj.size();
+
     Agraph_t* graph = agopen((char*)"g", Agdirected, 0);
     assert(graph);
     set_attrs(graph, {.label = reg.data(), .font = FONT});
 
-    std::vector<Agnode_t*> g_nodes(num_nodes, nullptr);
+    std::vector<Agnode_t*> g_nodes(size, nullptr);
     std::array<char, 4> lb = {};
     usize id = 0; /* Renumber states since we're ignoring dead ones */
-    for (usize src = 0; src < num_nodes; ++src) {
-        if (is_active[src]) {
+    for (usize src = 0; src < size; ++src) {
+        if (flags[src] & ACTIVE) {
             *std::to_chars(lb.data(), lb.data() + sizeof(lb) - 1, id++ + 1).ptr = '\0';
             g_nodes[src] = agnode(graph, lb.data(), 1);
             assert(g_nodes[src]);
@@ -440,9 +470,9 @@ export_graph(const char* output_path, const std::string& reg)
         }
     }
 
-    for (usize src = 0; src < num_nodes; ++src) {
+    for (usize src = 0; src < size; ++src) {
         for (auto [dest, symbol] : adj[src]) {
-            if (!is_active[src] || !is_active[dest])
+            if (!(flags[src] & flags[dest] & ACTIVE))
                 continue;
 
             lb = {symbol};
@@ -455,15 +485,15 @@ export_graph(const char* output_path, const std::string& reg)
         }
     }
 
-    if (!is_final[START_NODE_ID]) {
+    if (!(flags[START_NODE_ID] & FINAL)) {
         set_attrs(g_nodes[START_NODE_ID], {.style = "filled", .color = START_NODE_COLOR});
     } else {
         set_attrs(g_nodes[START_NODE_ID],
                   {.style = "wedged", .color = START_FINAL_NODE_COLOR});
     }
 
-    for (usize src = 1; src < num_nodes; ++src) {
-        if (is_active[src] && is_final[src])
+    for (usize src = 1; src < size; ++src) {
+        if ((flags[src] & ACTIVE) && (flags[src] & FINAL))
             set_attrs(g_nodes[src], {.style = "filled", .color = FINAL_NODE_COLOR});
     }
 
@@ -519,20 +549,16 @@ main(const int argc, const char* argv[])
     }
 
     /* Fill the adjacency  matrix and save node ptrs */
-    fill_adj_list(*root);
-
-    /* Initialize some helper vectors for when they're used */
-    visited.resize(num_nodes);
-    is_active.resize(num_nodes, true);
+    auto graph = to_graph(*root);
 
     /* No need for the old NFA representation anymore */
     for (NFANode* node : node_ptrs)
         delete node;
 
     /* Transform λ-NFA to NFA without λ-transitions and mark active states */
-    transitive_closure();
-    remove_lambdas();
-    mark_active();
+    transitive_closure(graph);
+    remove_lambdas(graph);
+    mark_active(graph);
 
-    export_graph("graph.dot", "\n\n" + std::string(infix));
+    export_graph(graph, "graph.dot", "\n\n" + std::string(infix));
 }
