@@ -4,7 +4,11 @@
 #include <vector>
 #include <string>
 #include <stack>
+#include <queue>
+#include <unordered_set>
+#include <unordered_map>
 #include <algorithm>
+#include <numeric>
 #include <optional>
 #include <charconv>
 #include <cassert>
@@ -12,19 +16,19 @@
 
 /* Macros */
 /* clang-format off */
-#define START_NODE_ID          0
-#define START_NODE_COLOR       "turquoise"
-#define FINAL_NODE_COLOR       "x11green"
-#define START_FINAL_NODE_COLOR "turquoise:x11green"
-#define FONT                   "monospace"
-#define S_LAMBDA               '\0'
-#define OP_CONCAT              '.'
-#define OP_UNION               '|'
-#define OP_KLEENE              '*'
-#define OP_PLUS                '+'
-#define OP_OPT                 '?'
-#define NUM_CHARS              (1 << 8)
-#define LAMBDA_UTF             {char(0xce), char(0xbb)}
+#define START_UNINITIALIZED (usize(-1))
+#define START_COLOR         "turquoise"
+#define FINAL_COLOR         "x11green"
+#define START_FINAL_COLOR   "turquoise:x11green"
+#define FONT                "monospace"
+#define S_LAMBDA            '\0'
+#define OP_CONCAT           '.'
+#define OP_UNION            '|'
+#define OP_KLEENE           '*'
+#define OP_PLUS             '+'
+#define OP_OPT              '?'
+#define NUM_CHARS           (1 << 8)
+#define LAMBDA_UTF          {char(0xce), char(0xbb)}
 
 /* Enums */
 enum class TokenType : u8 {
@@ -37,8 +41,9 @@ enum class TokenType : u8 {
 
 enum GraphNodeFlag : u32 {
     VISITED = 1 << 0,
-    FINAL   = 1 << 1,
-    ACTIVE  = 1 << 2, /* Equivalent to: (not DEAD) && (not UNREACHABLE) */
+    START   = 1 << 1,
+    FINAL   = 1 << 2,
+    ACTIVE  = 1 << 3, /* Equivalent to: (not DEAD) && (not UNREACHABLE) */
 };
 /* clang-format on */
 
@@ -55,6 +60,12 @@ struct NFAFragment {
     NFANode* finish;
 };
 
+struct Edge {
+    usize src;
+    usize dest;
+    char symbol;
+};
+
 struct Transition {
     usize dest;
     char symbol;
@@ -63,6 +74,7 @@ struct Transition {
 struct Graph {
     std::vector<std::vector<Transition>> adj;
     std::vector<u32> flags;
+    usize start;
 };
 
 struct AgobjAttrs {
@@ -98,12 +110,26 @@ static Graph to_graph(NFANode*);
 static void add_transitive_closure_helper(usize, usize, std::vector<Transition>&, Graph&);
 static void add_transitive_closure(Graph&);
 static void remove_lambdas(Graph&);
-static void mark_active_nodes_helper(usize, Graph&);
-static void mark_active_nodes(Graph&);
+static void mark_active_nodes(usize, Graph&);
+static void remove_inactive_nodes(Graph&);
+static Graph to_dfa_graph(const Graph&);
 static void set_attrs(void*, const AgobjAttrs&);
 static void export_graph(const Graph&, const char*, const std::string&);
 
 /* Functions definitions  */
+template<>
+struct std::hash<std::unordered_set<usize>> {
+    std::size_t
+    operator()(const std::unordered_set<usize>& xs) const noexcept
+    {
+        std::size_t seed = 0;
+        for (std::size_t x : xs)
+            seed ^= x + 0x9e3779b9 + (seed << 6) + (seed >> 2); /* from boost::hash_combine */
+
+        return seed;
+    }
+};
+
 bool
 operator<(const Transition& x, const Transition& y)
 {
@@ -303,7 +329,7 @@ to_graph_helper(NFANode* src, Graph& g)
     if (!src || src->visited)
         return;
 
-    auto& [adj, flags] = g;
+    auto& [adj, flags, _] = g;
 
     node_ptrs.push_back(src);
 
@@ -312,6 +338,11 @@ to_graph_helper(NFANode* src, Graph& g)
     while (src->id >= adj.size()) {
         adj.push_back({});
         flags.push_back({});
+    }
+
+    if (g.start == START_UNINITIALIZED) {
+        flags[src->id] |= START;
+        g.start = src->id;
     }
 
     auto v0 = src->neighbours[0];
@@ -333,15 +364,17 @@ Graph
 to_graph(NFANode* src)
 {
     Graph g = {};
+    g.start = START_UNINITIALIZED;
     to_graph_helper(src, g);
 
+    assert(g.start != START_UNINITIALIZED);
     return g;
 }
 
 void
 add_transitive_closure_helper(usize from, usize src, std::vector<Transition>& to_add, Graph& g)
 {
-    auto& [adj, flags] = g;
+    auto& [adj, flags, _] = g;
 
     if (flags[src] & VISITED)
         return;
@@ -361,7 +394,7 @@ add_transitive_closure_helper(usize from, usize src, std::vector<Transition>& to
 void
 add_transitive_closure(Graph& g)
 {
-    auto& [adj, flags] = g;
+    auto& [adj, flags, _] = g;
 
     std::vector<Transition> to_add;
     for (usize src = 0; src < adj.size(); ++src) {
@@ -406,9 +439,9 @@ remove_lambdas(Graph& g)
 }
 
 void
-mark_active_nodes_helper(usize src, Graph& g)
+mark_active_nodes(usize src, Graph& g)
 {
-    auto& [adj, flags] = g;
+    auto& [adj, flags, _] = g;
 
     if (flags[src] & VISITED)
         return;
@@ -419,18 +452,149 @@ mark_active_nodes_helper(usize src, Graph& g)
         flags[src] |= ACTIVE;
 
     for (auto [dest, symbol] : adj[src]) {
-        mark_active_nodes_helper(dest, g);
+        mark_active_nodes(dest, g);
         flags[src] |= flags[dest] & ACTIVE;
     }
 }
 
 void
-mark_active_nodes(Graph& g)
+remove_inactive_nodes(Graph& g)
 {
+    /*
+     *  Useful reducing NFA nodes. Does not change the resulting DFA because
+     *  the subset construction doesn't touch inactive nodes.
+     */
+
     for (auto& f : g.flags)
         f &= ~(VISITED | ACTIVE);
 
-    mark_active_nodes_helper(START_NODE_ID, g);
+    mark_active_nodes(g.start, g);
+
+    /* Remove edges to inactive nodes */
+    for (auto& transitions : g.adj) {
+        transitions.erase(std::partition(transitions.begin(),
+                                         transitions.end(),
+                                         [&](auto& transition) {
+                                             usize dest = transition.dest;
+                                             return bool(g.flags[dest] & ACTIVE);
+                                         }),
+                          transitions.end());
+    }
+
+    /* Partition nodes based on active-ness */
+    std::vector<usize> indexes(g.adj.size());
+    std::iota(indexes.begin(), indexes.end(), 0);
+    auto last = std::partition(indexes.begin(), indexes.end(), [&](usize src) {
+        return bool(g.flags[src] & ACTIVE);
+    });
+
+    /* Map the old indexes to the new indexes */
+    std::vector<usize> new_indexes(g.adj.size());
+    for (usize src = 0; src < g.adj.size(); ++src)
+        new_indexes[indexes[src]] = src;
+
+    /* Create the new adjacency list and flag vector */
+    std::vector<std::vector<Transition>> new_adj;
+    std::vector<u32> new_flags;
+    g.start = START_UNINITIALIZED;
+    for (auto it = indexes.begin(); it != last; ++it) {
+        new_adj.emplace_back(std::move(g.adj[*it]));
+        new_flags.emplace_back(g.flags[*it]);
+    }
+
+    /* Replace the old values */
+    g.adj = std::move(new_adj);
+    g.flags = std::move(new_flags);
+
+    /* Renumber the edge dests */
+    for (usize src = 0; src < g.adj.size(); ++src) {
+        for (auto& [dest, _] : g.adj[src]) {
+            dest = new_indexes[dest];
+        }
+    }
+
+    /* Find the (possibly changed) start node index */
+    for (usize src = 0; src < g.flags.size(); ++src) {
+        if (g.flags[src] & START)
+            g.start = src;
+    }
+
+    /* Check that everything went ok */
+    assert(g.start != START_UNINITIALIZED);
+    for (usize src = 0; src < g.adj.size(); ++src) {
+        for (auto& [dest, _] : g.adj[src])
+            assert(dest < g.adj.size());
+    }
+}
+
+Graph
+to_dfa_graph(const Graph& nfa)
+{
+    usize next_id = 1;
+    std::vector<Edge> edges;
+    std::queue<std::unordered_set<usize>> queue;
+    std::unordered_map<std::unordered_set<usize>, usize> ids;
+    std::unordered_set<usize> finals;
+
+    queue.push({nfa.start});
+    ids.insert({{nfa.start}, next_id++});
+    while (!queue.empty()) {
+        auto src_subset = std::move(queue.front());
+        queue.pop();
+
+        auto src_subset_id = ids[src_subset];
+
+        /* Check if this subset will become a final node */
+        for (auto src : src_subset) {
+            if (nfa.flags[src] & FINAL) {
+                finals.insert(src_subset_id);
+                break;
+            }
+        }
+
+        /* Create edges from the source subset through each symbol */
+        for (char target_symbol = 'a'; target_symbol <= 'z'; ++target_symbol) {
+            std::unordered_set<usize> dest_subset;
+            for (auto src : src_subset) {
+                for (auto [dest, symbol] : nfa.adj[src]) {
+                    if (symbol == target_symbol)
+                        dest_subset.insert(dest);
+                }
+            }
+
+            if (dest_subset.empty())
+                continue;
+
+            usize& dest_subset_id = ids[dest_subset];
+
+            /*
+             *  If this subset has not been visited yet, give it an identifier
+             *  and add it to the queue.
+             */
+            if (!dest_subset_id) {
+                dest_subset_id = next_id++;
+                queue.push(std::move(dest_subset));
+            }
+
+            /* Create the actual edge from the source subset to the destination */
+            edges.push_back({src_subset_id, dest_subset_id, target_symbol});
+        }
+    }
+
+    Graph dfa{};
+    dfa.adj.resize(next_id - 1);
+    dfa.flags.resize(next_id - 1);
+
+    for (auto& e : edges)
+        dfa.adj[e.src - 1].push_back({e.dest - 1, e.symbol});
+    for (auto src : finals)
+        dfa.flags[src - 1] |= FINAL;
+
+    auto start_subset_id = ids.at({nfa.start});
+    dfa.flags[start_subset_id - 1] |= START;
+    dfa.start = start_subset_id - 1;
+
+    return dfa;
 }
 
 void
@@ -449,7 +613,7 @@ set_attrs(void* obj, const AgobjAttrs& attrs)
 void
 export_graph(const Graph& g, const char* output_path, const std::string& reg)
 {
-    const auto& [adj, flags] = g;
+    const auto& [adj, flags, _] = g;
     const usize size = adj.size();
 
     Agraph_t* graph = agopen((char*)"g", Agdirected, 0);
@@ -458,21 +622,30 @@ export_graph(const Graph& g, const char* output_path, const std::string& reg)
 
     std::vector<Agnode_t*> g_nodes(size, nullptr);
     std::array<char, 4> lb = {};
-    usize id = 0; /* Renumber states since we're ignoring dead ones */
     for (usize src = 0; src < size; ++src) {
-        if (flags[src] & ACTIVE) {
-            *std::to_chars(lb.data(), lb.data() + sizeof(lb) - 1, id++ + 1).ptr = '\0';
-            g_nodes[src] = agnode(graph, lb.data(), 1);
-            assert(g_nodes[src]);
-            set_attrs(g_nodes[src], {.font = FONT});
+        *std::to_chars(lb.data(), lb.data() + sizeof(lb) - 1, src).ptr = '\0';
+
+        auto node = agnode(graph, lb.data(), 1);
+        assert(node);
+        set_attrs(node, {.font = FONT});
+        g_nodes[src] = node;
+
+        switch (flags[src] & (START | FINAL)) {
+        case START | FINAL:
+            set_attrs(node, {.style = "wedged", .font = FONT, .color = START_FINAL_COLOR});
+            break;
+        case START:
+            set_attrs(node, {.style = "filled", .color = START_COLOR});
+            break;
+        case FINAL:
+            set_attrs(node, {.style = "filled", .color = FINAL_COLOR});
+        default:
+            break;
         }
     }
 
     for (usize src = 0; src < size; ++src) {
         for (auto [dest, symbol] : adj[src]) {
-            if (!(flags[src] & flags[dest] & ACTIVE))
-                continue;
-
             lb = {symbol};
             if (lb[0] == S_LAMBDA)
                 lb = LAMBDA_UTF;
@@ -481,18 +654,6 @@ export_graph(const Graph& g, const char* output_path, const std::string& reg)
             assert(edge);
             set_attrs(edge, {.label = lb.data(), .font = FONT});
         }
-    }
-
-    if (!(flags[START_NODE_ID] & FINAL)) {
-        set_attrs(g_nodes[START_NODE_ID], {.style = "filled", .color = START_NODE_COLOR});
-    } else {
-        set_attrs(g_nodes[START_NODE_ID],
-                  {.style = "wedged", .color = START_FINAL_NODE_COLOR});
-    }
-
-    for (usize src = 1; src < size; ++src) {
-        if ((flags[src] & ACTIVE) && (flags[src] & FINAL))
-            set_attrs(g_nodes[src], {.style = "filled", .color = FINAL_NODE_COLOR});
     }
 
     auto file = fopen(output_path, "w");
@@ -546,16 +707,16 @@ main(const int argc, const char* argv[])
         return EXIT_FAILURE;
     }
 
-    auto graph = to_graph(*root);
+    auto nfa_graph = to_graph(*root);
 
     /* No need for the old NFA representation anymore */
     for (NFANode* node : node_ptrs)
         delete node;
 
     /* Transform λ-NFA to NFA without λ-transitions and mark active states */
-    add_transitive_closure(graph);
-    remove_lambdas(graph);
-    mark_active_nodes(graph);
+    add_transitive_closure(nfa_graph);
+    remove_lambdas(nfa_graph);
 
-    export_graph(graph, "graph.dot", "\n\n" + std::string(infix));
+    auto dfa_graph = to_dfa_graph(nfa_graph);
+    export_graph(dfa_graph, "graph.dot", "\n\n" + std::string(infix));
 }
