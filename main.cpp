@@ -461,13 +461,12 @@ void
 remove_inactive_nodes(Graph& g)
 {
     /*
-     *  Useful reducing NFA nodes. Does not change the resulting DFA because
-     *  the subset construction doesn't touch inactive nodes.
+     *  Useful for reducing NFA nodes. Does not change the resulting DFA
+     *  because the subset construction doesn't touch inactive nodes.
      */
 
     for (auto& f : g.flags)
         f &= ~(VISITED | ACTIVE);
-
     mark_active_nodes(g.start, g);
 
     /* Remove edges to inactive nodes */
