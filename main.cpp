@@ -46,7 +46,6 @@ enum GraphNodeFlag : u32 {
     VISITED = 1 << 0,
     START   = 1 << 1,
     FINAL   = 1 << 2,
-    ACTIVE  = 1 << 3, /* Equivalent to: (not DEAD) && (not UNREACHABLE) */
 };
 /* clang-format on */
 
@@ -112,8 +111,6 @@ static Graph to_graph(NFANode*);
 static void add_transitive_closure_helper(usize, usize, std::vector<Transition>&, Graph&);
 static void add_transitive_closure(Graph&);
 static void remove_lambdas(Graph&);
-static void mark_active_nodes(usize, Graph&);
-static void remove_inactive_nodes(Graph&);
 static Graph to_dfa_graph(const Graph&);
 static void print_components(const Graph&, FILE*);
 static void set_attrs(void*, const AgobjAttrs&);
@@ -433,91 +430,6 @@ remove_lambdas(Graph& g)
         std::sort(ts.begin(), ts.end());
         auto begin_of_duplicates = std::unique(ts.begin(), ts.end());
         ts.erase(begin_of_duplicates, ts.end());
-    }
-}
-
-void
-mark_active_nodes(usize src, Graph& g)
-{
-    auto& [adj, flags, _] = g;
-
-    if (flags[src] & VISITED)
-        return;
-
-    flags[src] |= VISITED;
-
-    if (flags[src] & FINAL)
-        flags[src] |= ACTIVE;
-
-    for (auto [dest, symbol] : adj[src]) {
-        mark_active_nodes(dest, g);
-        flags[src] |= flags[dest] & ACTIVE;
-    }
-}
-
-void
-remove_inactive_nodes(Graph& g)
-{
-    /*
-     *  Useful for reducing NFA nodes. Does not change the resulting DFA
-     *  because the subset construction doesn't touch inactive nodes.
-     */
-
-    for (auto& f : g.flags)
-        f &= ~(VISITED | ACTIVE);
-    mark_active_nodes(g.start, g);
-
-    /* Remove edges to inactive nodes */
-    for (auto& ts : g.adj) {
-        auto begin_of_inactive = std::partition(ts.begin(), ts.end(), [&](auto& t) {
-            return bool(g.flags[t.dest] & ACTIVE);
-        });
-        ts.erase(begin_of_inactive, ts.end());
-    }
-
-    /* Partition nodes based on active-ness */
-    std::vector<usize> indexes(g.adj.size());
-    std::iota(indexes.begin(), indexes.end(), 0);
-    auto end_of_active = std::partition(indexes.begin(), indexes.end(), [&](usize src) {
-        return bool(g.flags[src] & ACTIVE);
-    });
-
-    /* Map the old indexes to the new indexes */
-    std::vector<usize> new_indexes(g.adj.size());
-    for (usize src = 0; src < g.adj.size(); ++src)
-        new_indexes[indexes[src]] = src;
-
-    /* Create the new adjacency list and flag vector */
-    std::vector<std::vector<Transition>> new_adj;
-    std::vector<u32> new_flags;
-    g.start = START_UNINITIALIZED;
-    for (auto it = indexes.begin(); it != end_of_active; ++it) {
-        new_adj.emplace_back(std::move(g.adj[*it]));
-        new_flags.emplace_back(g.flags[*it]);
-    }
-
-    /* Replace the old values */
-    g.adj = std::move(new_adj);
-    g.flags = std::move(new_flags);
-
-    /* Renumber the edge dests */
-    for (usize src = 0; src < g.adj.size(); ++src) {
-        for (auto& [dest, _] : g.adj[src]) {
-            dest = new_indexes[dest];
-        }
-    }
-
-    /* Find the (possibly changed) start node index */
-    for (usize src = 0; src < g.flags.size(); ++src) {
-        if (g.flags[src] & START)
-            g.start = src;
-    }
-
-    /* Check that everything went ok */
-    assert(g.start != START_UNINITIALIZED);
-    for (usize src = 0; src < g.adj.size(); ++src) {
-        for (auto& [dest, _] : g.adj[src])
-            assert(dest < g.adj.size());
     }
 }
 
