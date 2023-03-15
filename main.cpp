@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <optional>
 #include <charconv>
+#include <cassert>
 #include "numtypes.hpp"
 
 /* Macros */
@@ -423,18 +424,19 @@ set_attrs(void* obj, const AgobjAttrs& attrs)
 void
 make_graph(const char* path, const std::string& reg)
 {
-    GVC_t* gvc = gvContext();
-    Agraph_t* g = agopen((char*)"g", Agdirected, 0);
-    set_attrs(g, {.label = reg.data(), .font = FONT});
+    Agraph_t* graph = agopen((char*)"g", Agdirected, 0);
+    assert(graph);
+    set_attrs(graph, {.label = reg.data(), .font = FONT});
 
-    std::vector<Agnode_t*> gvc_nodes(num_nodes, nullptr);
+    std::vector<Agnode_t*> g_nodes(num_nodes, nullptr);
     std::array<char, 4> lb = {};
     usize id = 0; /* Renumber states since we're ignoring dead ones */
     for (usize src = 0; src < num_nodes; ++src) {
         if (can_reach_finish[src]) {
             *std::to_chars(lb.data(), lb.data() + sizeof(lb) - 1, id++ + 1).ptr = '\0';
-            gvc_nodes[src] = agnode(g, lb.data(), 1);
-            set_attrs(gvc_nodes[src], {.font = FONT});
+            g_nodes[src] = agnode(graph, lb.data(), 1);
+            assert(g_nodes[src]);
+            set_attrs(g_nodes[src], {.font = FONT});
         }
     }
 
@@ -447,19 +449,20 @@ make_graph(const char* path, const std::string& reg)
             if (lb[0] == S_LAMBDA)
                 lb = LAMBDA_UTF;
 
-            auto edge = agedge(g, gvc_nodes[src], gvc_nodes[dest], nullptr, 1);
+            auto edge = agedge(graph, g_nodes[src], g_nodes[dest], nullptr, 1);
+            assert(edge);
             set_attrs(edge, {.label = lb.data(), .font = FONT});
         }
     }
 
     if (!is_final[start_node])
-        set_attrs(gvc_nodes[start_node], {.style = "filled", .color = START_NODE_COLOR});
+        set_attrs(g_nodes[start_node], {.style = "filled", .color = START_NODE_COLOR});
     else
-        set_attrs(gvc_nodes[start_node], {.style = "wedged", .color = START_FINAL_NODE_COLOR});
+        set_attrs(g_nodes[start_node], {.style = "wedged", .color = START_FINAL_NODE_COLOR});
 
     for (usize src = 1; src < num_nodes; ++src) {
         if (can_reach_finish[src] && is_final[src])
-            set_attrs(gvc_nodes[src], {.style = "filled", .color = FINAL_NODE_COLOR});
+            set_attrs(g_nodes[src], {.style = "filled", .color = FINAL_NODE_COLOR});
     }
 
     auto file = fopen(path, "w");
@@ -468,11 +471,13 @@ make_graph(const char* path, const std::string& reg)
         return;
     }
 
-    gvLayout(gvc, g, "dot");
-    gvRender(gvc, g, "dot", file);
+    GVC_t* context = gvContext();
+    assert(context);
+    gvLayout(context, graph, "dot");
+    gvRender(context, graph, "dot", file);
 
-    gvFreeLayout(gvc, g);
-    agclose(g);
+    gvFreeLayout(context, graph);
+    agclose(graph);
     fclose(file);
 }
 
