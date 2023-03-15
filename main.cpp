@@ -427,14 +427,14 @@ remove_lambdas(Graph& g)
         adj[u].insert(adj[u].end(), to_add.begin(), to_add.end());
     }
 
-    for (auto& node_transitions : adj) {
-        node_transitions.erase(std::partition(node_transitions.begin(),
-                                              node_transitions.end(),
-                                              [](auto& t) { return t.symbol != S_LAMBDA; }),
-                               node_transitions.end());
-        std::sort(node_transitions.begin(), node_transitions.end());
-        node_transitions.erase(std::unique(node_transitions.begin(), node_transitions.end()),
-                               node_transitions.end());
+    for (auto& ts : adj) {
+        auto begin_of_lambda =
+            std::partition(ts.begin(), ts.end(), [](auto& t) { return t.symbol != S_LAMBDA; });
+        ts.erase(begin_of_lambda, ts.end());
+
+        std::sort(ts.begin(), ts.end());
+        auto begin_of_duplicates = std::unique(ts.begin(), ts.end());
+        ts.erase(begin_of_duplicates, ts.end());
     }
 }
 
@@ -471,20 +471,17 @@ remove_inactive_nodes(Graph& g)
     mark_active_nodes(g.start, g);
 
     /* Remove edges to inactive nodes */
-    for (auto& transitions : g.adj) {
-        transitions.erase(std::partition(transitions.begin(),
-                                         transitions.end(),
-                                         [&](auto& transition) {
-                                             usize dest = transition.dest;
-                                             return bool(g.flags[dest] & ACTIVE);
-                                         }),
-                          transitions.end());
+    for (auto& ts : g.adj) {
+        auto begin_of_inactive = std::partition(ts.begin(), ts.end(), [&](auto& t) {
+            return bool(g.flags[t.dest] & ACTIVE);
+        });
+        ts.erase(begin_of_inactive, ts.end());
     }
 
     /* Partition nodes based on active-ness */
     std::vector<usize> indexes(g.adj.size());
     std::iota(indexes.begin(), indexes.end(), 0);
-    auto last = std::partition(indexes.begin(), indexes.end(), [&](usize src) {
+    auto end_of_active = std::partition(indexes.begin(), indexes.end(), [&](usize src) {
         return bool(g.flags[src] & ACTIVE);
     });
 
@@ -497,7 +494,7 @@ remove_inactive_nodes(Graph& g)
     std::vector<std::vector<Transition>> new_adj;
     std::vector<u32> new_flags;
     g.start = START_UNINITIALIZED;
-    for (auto it = indexes.begin(); it != last; ++it) {
+    for (auto it = indexes.begin(); it != end_of_active; ++it) {
         new_adj.emplace_back(std::move(g.adj[*it]));
         new_flags.emplace_back(g.flags[*it]);
     }
