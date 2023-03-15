@@ -22,7 +22,7 @@ rtd: ${OBJ}
 	${CXX} -o $@ ${OBJ} ${LDFLAGS}
 
 svg:
-	dot -Tsvg graph.dot >output.svg
+	dot -Tsvg graph.dot >graph.svg
 
 tests: rtd
 	rm -f output/*
@@ -31,6 +31,6 @@ tests: rtd
 	done
 
 clean:
-	rm -f rtd ${OBJ} graph.dot output.svg
+	rm -f rtd ${OBJ} graph.dot graph.svg
 
 .PHONY: all options svg tests clean

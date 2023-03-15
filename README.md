@@ -35,6 +35,14 @@ $ cd rtd
 $ make
 ```
 
+### Example:
+
+```bash
+$ ./rtd (a|b)*abb >graph.dot
+$ dot -Tsvg graph.dot >graph.svg
+$ firefox graph.svg
+```
+
 ## Resources
 
 * ['Shunting yard' algorithm](https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm);

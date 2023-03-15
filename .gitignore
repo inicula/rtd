@@ -5,5 +5,6 @@ a.out
 .cache
 compile_commands.json
 graph.dot
+graph.svg
 output.svg
 output
