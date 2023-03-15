@@ -19,7 +19,7 @@
 #define START_UNINITIALIZED (usize(-1))
 #define START_COLOR         "turquoise"
 #define FINAL_COLOR         "x11green"
-#define START_FINAL_COLOR   "turquoise:x11green"
+#define START_FINAL_COLOR   START_COLOR ":" FINAL_COLOR
 #define FONT                "monospace"
 #define S_LAMBDA            '\0'
 #define OP_CONCAT           '.'
