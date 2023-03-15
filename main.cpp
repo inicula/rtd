@@ -12,6 +12,7 @@
 
 /* Macros */
 /* clang-format off */
+#define START_NODE_ID            0
 #define START_NODE_COLOR         "turquoise"
 #define FINAL_NODE_COLOR         "x11green"
 #define START_FINAL_NODE_COLOR   "turquoise:x11green"
@@ -67,7 +68,6 @@ static std::vector<std::vector<Transition>> adj;
 static std::vector<u8> visited;
 static std::vector<u8> is_final;  /* final[i] <=> node `i` represents a final state */
 static std::vector<u8> is_active; /* active[i] <=> node `i` is not DEAD and not UNREACHABLE */
-static u8 start_node;
 static usize num_nodes;
 static constexpr auto OP_PREC = []() {
     std::array<u8, NUM_CHARS> arr = {};
@@ -300,7 +300,7 @@ fill_adj_list(NFANode* src)
     node_ptrs.push_back(src);
 
     src->visited = true;
-    src->id = num_nodes++;
+    src->id = num_nodes++; /* Pre-order traversal, which is why `START_NODE_ID` is 0 */
     while (src->id >= adj.size()) {
         adj.push_back({});
         is_final.push_back({});
@@ -405,7 +405,7 @@ mark_active()
 {
     std::fill(visited.begin(), visited.end(), false);
     std::fill(is_active.begin(), is_active.end(), false);
-    mark_active_helper(start_node);
+    mark_active_helper(START_NODE_ID);
 }
 
 void
@@ -455,10 +455,12 @@ export_graph(const char* output_path, const std::string& reg)
         }
     }
 
-    if (!is_final[start_node])
-        set_attrs(g_nodes[start_node], {.style = "filled", .color = START_NODE_COLOR});
-    else
-        set_attrs(g_nodes[start_node], {.style = "wedged", .color = START_FINAL_NODE_COLOR});
+    if (!is_final[START_NODE_ID]) {
+        set_attrs(g_nodes[START_NODE_ID], {.style = "filled", .color = START_NODE_COLOR});
+    } else {
+        set_attrs(g_nodes[START_NODE_ID],
+                  {.style = "wedged", .color = START_FINAL_NODE_COLOR});
+    }
 
     for (usize src = 1; src < num_nodes; ++src) {
         if (is_active[src] && is_final[src])
