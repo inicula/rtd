@@ -627,7 +627,6 @@ export_graph(const Graph& g, const char* output_path, const std::string& reg)
 
         auto node = agnode(graph, lb.data(), 1);
         assert(node);
-        set_attrs(node, {.font = FONT});
         g_nodes[src] = node;
 
         switch (flags[src] & (START | FINAL)) {
@@ -635,10 +634,11 @@ export_graph(const Graph& g, const char* output_path, const std::string& reg)
             set_attrs(node, {.style = "wedged", .font = FONT, .color = START_FINAL_COLOR});
             break;
         case START:
-            set_attrs(node, {.style = "filled", .color = START_COLOR});
+            set_attrs(node, {.style = "filled", .font = FONT, .color = START_COLOR});
             break;
         case FINAL:
-            set_attrs(node, {.style = "filled", .color = FINAL_COLOR});
+            set_attrs(node, {.style = "filled", .font = FONT, .color = FINAL_COLOR});
+            break;
         default:
             break;
         }
