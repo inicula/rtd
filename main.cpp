@@ -548,7 +548,6 @@ main(const int argc, const char* argv[])
         return EXIT_FAILURE;
     }
 
-    /* Fill the adjacency  matrix and save node ptrs */
     auto graph = to_graph(*root);
 
     /* No need for the old NFA representation anymore */
