@@ -702,7 +702,7 @@ main(const int argc, const char* argv[])
     for (NFANode* node : node_ptrs)
         delete node;
 
-    /* Transform λ-NFA to NFA without λ-transitions and mark active states */
+    /* Transform λ-NFA to NFA without λ-transitions */
     add_transitive_closure(nfa_graph);
     remove_lambdas(nfa_graph);
 
