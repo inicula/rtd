@@ -43,7 +43,7 @@ $ make
 ### Example:
 
 ```bash
-$ ./rtd '(a|b)*abb' >graph.dot
+$ ./rtd -e '(a|b)*abb' >graph.dot
 $ dot -Tsvg graph.dot >graph.svg
 $ firefox graph.svg
 ```
