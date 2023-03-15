@@ -60,16 +60,16 @@ struct Transition {
     char symbol;
 };
 
+struct Graph {
+    std::vector<std::vector<Transition>> adj;
+    std::vector<u32> flags;
+};
+
 struct AgobjAttrs {
     const char* label = nullptr;
     const char* style = nullptr;
     const char* font = nullptr;
     const char* color = nullptr;
-};
-
-struct Graph {
-    std::vector<std::vector<Transition>> adj;
-    std::vector<u32> flags;
 };
 
 /* Globals */
