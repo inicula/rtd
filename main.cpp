@@ -95,7 +95,7 @@ static void remove_lambdas();
 static void mark_active_helper(usize);
 static void mark_active();
 static void set_attrs(void*, const AgobjAttrs&);
-static void make_graph(const char*, const std::string&);
+static void export_graph(const char*, const std::string&);
 
 /* Functions definitions  */
 bool
@@ -422,7 +422,7 @@ set_attrs(void* obj, const AgobjAttrs& attrs)
 }
 
 void
-make_graph(const char* path, const std::string& reg)
+export_graph(const char* output_path, const std::string& reg)
 {
     Agraph_t* graph = agopen((char*)"g", Agdirected, 0);
     assert(graph);
@@ -465,7 +465,7 @@ make_graph(const char* path, const std::string& reg)
             set_attrs(g_nodes[src], {.style = "filled", .color = FINAL_NODE_COLOR});
     }
 
-    auto file = fopen(path, "w");
+    auto file = fopen(output_path, "w");
     if (!file) {
         fmt_perror("fopen");
         return;
@@ -532,5 +532,5 @@ main(const int argc, const char* argv[])
     remove_lambdas();
     mark_active();
 
-    make_graph("graph.dot", "\n\n" + std::string(infix));
+    export_graph("graph.dot", "\n\n" + std::string(infix));
 }
