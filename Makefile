@@ -27,7 +27,7 @@ svg:
 tests: rtd
 	rm -f output/*
 	for filename in tests/*; do \
-			./rtd "$$(cat "$$filename")" >graph.dot && dot -Tsvg graph.dot >output/"$$(basename "$$filename")".svg ; \
+			./rtd -e "$$(cat "$$filename")" >graph.dot && dot -Tsvg graph.dot >output/"$$(basename "$$filename")".svg ; \
 	done
 
 clean:

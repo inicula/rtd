@@ -7,6 +7,7 @@
 #include <queue>
 #include <unordered_set>
 #include <unordered_map>
+#include <set>
 #include <algorithm>
 #include <numeric>
 #include <optional>
@@ -114,6 +115,7 @@ static void remove_lambdas(Graph&);
 static void mark_active_nodes(usize, Graph&);
 static void remove_inactive_nodes(Graph&);
 static Graph to_dfa_graph(const Graph&);
+static void print_components(const Graph&, FILE*);
 static void set_attrs(void*, const AgobjAttrs&);
 static void export_graph(const Graph&, FILE*, const std::string&);
 static void usage();
@@ -591,6 +593,57 @@ to_dfa_graph(const Graph& nfa)
 }
 
 void
+print_components(const Graph& g, FILE* output)
+{
+    auto& [adj, flags, start] = g;
+
+    auto size = adj.size();
+
+    /* Print states */
+    fprintf(output, "STATES: {q%lu", start);
+    for (usize src = 0; src < size; ++src) {
+        if (src == start)
+            continue;
+
+        fprintf(output, ", q%lu", src);
+    }
+    fprintf(output, "}\n");
+
+    /* Print alphabet */
+    std::set<char> sigma;
+    for (usize src = 0; src < size; ++src) {
+        for (auto& [_, symbol] : adj[src])
+            sigma.insert(symbol);
+    }
+
+    fprintf(output, "SIGMA: {%c", *sigma.begin());
+    for (auto it = std::next(sigma.begin()); it != sigma.end(); ++it)
+        fprintf(output, ", %c", *it);
+    fprintf(output, "}\n");
+
+    /* Print transitions */
+    fprintf(output, "TRANSITIONS:\n");
+    for (usize src = 0; src < size; ++src) {
+        for (auto [dest, symbol] : adj[src])
+            fprintf(output, "\tδ(q%lu, %c) = q%lu\n", src, symbol, dest);
+    }
+
+    /* Print start state */
+    fprintf(output, "START STATE: q%lu\n", g.start);
+
+    /* Print final state */
+    fprintf(output, "FINAL STATES: {");
+    bool first = true;
+    for (usize src = 0; src < size; ++src) {
+        if (flags[src] & FINAL) {
+            fprintf(output, first ? "q%lu" : ", q%lu", src);
+            first = false;
+        }
+    }
+    fprintf(output, "}\n");
+}
+
+void
 set_attrs(void* obj, const AgobjAttrs& attrs)
 {
     if (attrs.label)
@@ -604,7 +657,7 @@ set_attrs(void* obj, const AgobjAttrs& attrs)
 }
 
 void
-export_graph(const Graph& g, FILE* output_file, const std::string& reg)
+export_graph(const Graph& g, FILE* output, const std::string& reg)
 {
     const auto& [adj, flags, _] = g;
     const usize size = adj.size();
@@ -652,7 +705,7 @@ export_graph(const Graph& g, FILE* output_file, const std::string& reg)
     GVC_t* context = gvContext();
     assert(context);
     gvLayout(context, graph, "dot");
-    gvRender(context, graph, "dot", output_file);
+    gvRender(context, graph, "dot", output);
 
     gvFreeLayout(context, graph);
     agclose(graph);
@@ -661,6 +714,7 @@ export_graph(const Graph& g, FILE* output_file, const std::string& reg)
 void
 usage()
 {
+    /* clang-format off */
     fprintf(
         stderr,
         "%s\n",
@@ -670,12 +724,15 @@ usage()
         "    -h\n"
         "        Print help info.\n"
         "    -a\n"
-        "        Set the alphabet of the regex as all alphanumericals.\n\n"
+        "        Set the alphabet of the regex as all alphanumericals.\n"
+        "    -e\n"
+        "        Export the graph in DOT language (by default, only the DFA components will be printed)\n\n"
         "OPTIONS:\n"
         "    -s <alphabet>\n"
         "        Set the alphabet of the regex (only alphanumericals allowed).\n"
         "    -o <output_file>\n"
         "        Set the path at which the graph file will be written (default is stdout).");
+    /* clang-format on */
 }
 
 int
@@ -684,13 +741,17 @@ main(const int argc, char* argv[])
     const char* alphabet = DEFAULT_ALPHABET;
     const char* output_path = nullptr;
     bool all_alnum = false;
+    bool exp = false;
 
     int opt;
-    while ((opt = getopt(argc, argv, "has:o:")) != -1) {
+    while ((opt = getopt(argc, argv, "heas:o:")) != -1) {
         switch (opt) {
         case 'h':
             usage();
             return EXIT_FAILURE;
+        case 'e':
+            exp = true;
+            break;
         case 'a':
             all_alnum = true;
             break;
@@ -760,11 +821,14 @@ main(const int argc, char* argv[])
 
     auto dfa_graph = to_dfa_graph(nfa_graph);
 
-    auto output_file = output_path ? fopen(output_path, "w") : stdout;
-    if (!output_file) {
+    auto output = output_path ? fopen(output_path, "w") : stdout;
+    if (!output) {
         perror("fopen");
         return EXIT_FAILURE;
     }
 
-    export_graph(dfa_graph, output_file, "\n\n" + std::string(infix));
+    if (exp)
+        export_graph(dfa_graph, output, "\n\n" + std::string(infix));
+    else
+        print_components(dfa_graph, output);
 }
