@@ -11,9 +11,10 @@
 
 /* Macros */
 /* clang-format off */
-#define START_NODE_COLOR         ((char*) "turquoise")
-#define FINAL_NODE_COLOR         ((char*) "x11green")
-#define START_FINAL_NODE_COLOR   ((char*) "turquoise:x11green")
+#define START_NODE_COLOR         "turquoise"
+#define FINAL_NODE_COLOR         "x11green"
+#define START_FINAL_NODE_COLOR   "turquoise:x11green"
+#define FONT                     "monospace"
 #define S_LAMBDA                 '\0'
 #define OP_CONCAT                '.'
 #define OP_UNION                 '|'
@@ -51,6 +52,13 @@ struct Transition {
     char symbol;
 };
 
+struct AgobjAttrs {
+    const char* label = nullptr;
+    const char* style = nullptr;
+    const char* font = nullptr;
+    const char* color = nullptr;
+};
+
 /* Globals */
 static bool in_alphabet[NUM_CHARS] = {};
 static std::vector<NFANode*> node_ptrs;
@@ -85,6 +93,7 @@ static void transitive_closure();
 static void remove_lambdas();
 static void mark_dead_helper(usize);
 static void mark_dead();
+static void set_attrs(void*, const AgobjAttrs&);
 static void make_graph(const char*, const std::string&);
 
 /* Functions definitions  */
@@ -399,21 +408,33 @@ mark_dead()
 }
 
 void
+set_attrs(void* obj, const AgobjAttrs& attrs)
+{
+    if (attrs.label)
+        agsafeset(obj, (char*)"label", (char*)attrs.label, (char*)"");
+    if (attrs.color)
+        agsafeset(obj, (char*)"color", (char*)attrs.color, (char*)"");
+    if (attrs.font)
+        agsafeset(obj, (char*)"fontname", (char*)attrs.font, (char*)"");
+    if (attrs.style)
+        agsafeset(obj, (char*)"style", (char*)attrs.style, (char*)"");
+}
+
+void
 make_graph(const char* path, const std::string& reg)
 {
     GVC_t* gvc = gvContext();
     Agraph_t* g = agopen((char*)"g", Agdirected, 0);
-    agsafeset(g, (char*)"label", (char*)reg.data(), (char*)"");
-    agsafeset(g, (char*)"fontname", (char*)"monospace", (char*)"");
+    set_attrs(g, {.label = reg.data(), .font = FONT});
 
-    usize id = 0; /* Renumber states since we're ignoring dead ones */
-    std::array<char, 4> lb = {};
     std::vector<Agnode_t*> gvc_nodes(num_nodes, nullptr);
+    std::array<char, 4> lb = {};
+    usize id = 0; /* Renumber states since we're ignoring dead ones */
     for (usize src = 0; src < num_nodes; ++src) {
         if (can_reach_finish[src]) {
             *std::to_chars(lb.data(), lb.data() + sizeof(lb) - 1, id++ + 1).ptr = '\0';
             gvc_nodes[src] = agnode(g, lb.data(), 1);
-            agsafeset(gvc_nodes[src], (char*)"fontname", (char*)"monospace", (char*)"");
+            set_attrs(gvc_nodes[src], {.font = FONT});
         }
     }
 
@@ -427,24 +448,18 @@ make_graph(const char* path, const std::string& reg)
                 lb = LAMBDA_UTF;
 
             auto edge = agedge(g, gvc_nodes[src], gvc_nodes[dest], nullptr, 1);
-            agsafeset(edge, (char*)"label", lb.data(), (char*)"");
-            agsafeset(edge, (char*)"fontname", (char*)"monospace", (char*)"");
+            set_attrs(edge, {.label = lb.data(), .font = FONT});
         }
     }
 
-    if (!is_final[start_node]) {
-        agsafeset(gvc_nodes[start_node], (char*)"color", START_NODE_COLOR, (char*)"");
-        agsafeset(gvc_nodes[start_node], (char*)"style", (char*)"filled", (char*)"");
-    } else {
-        agsafeset(gvc_nodes[start_node], (char*)"color", START_FINAL_NODE_COLOR, (char*)"");
-        agsafeset(gvc_nodes[start_node], (char*)"style", (char*)"wedged", (char*)"");
-    }
+    if (!is_final[start_node])
+        set_attrs(gvc_nodes[start_node], {.style = "filled", .color = START_NODE_COLOR});
+    else
+        set_attrs(gvc_nodes[start_node], {.style = "wedged", .color = START_FINAL_NODE_COLOR});
 
     for (usize src = 1; src < num_nodes; ++src) {
-        if (can_reach_finish[src] && is_final[src]) {
-            agsafeset(gvc_nodes[src], (char*)"color", FINAL_NODE_COLOR, (char*)"");
-            agsafeset(gvc_nodes[src], (char*)"style", (char*)"filled", (char*)"");
-        }
+        if (can_reach_finish[src] && is_final[src])
+            set_attrs(gvc_nodes[src], {.style = "filled", .color = FINAL_NODE_COLOR});
     }
 
     auto file = fopen(path, "w");
@@ -498,6 +513,8 @@ main(const int argc, const char* argv[])
 
     /* Fill the adjacency  matrix and save node ptrs */
     fill_adj_list(*root);
+
+    /* Initialize some helper vectors for when they're used */
     visited.resize(num_nodes);
     can_reach_finish.resize(num_nodes, true);
 
@@ -505,8 +522,10 @@ main(const int argc, const char* argv[])
     for (NFANode* node : node_ptrs)
         delete node;
 
+    /* Transform λ-NFA to NFA without epsilon transitions and dead/unreachable states */
     transitive_closure();
     remove_lambdas();
     mark_dead();
+
     make_graph("graph.dot", "\n\n" + std::string(infix));
 }

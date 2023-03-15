@@ -1,5 +1,5 @@
 CXX=c++
-CXXFLAGS=-std=c++17 -Os -flto -fno-exceptions -fno-rtti -march=native -Wall -Wextra -Wpedantic -Wconversion
+CXXFLAGS=-std=c++20 -Os -flto -fno-exceptions -fno-rtti -march=native -Wall -Wextra -Wpedantic -Wconversion
 LDFLAGS=`pkg-config fmt libgvc --libs` -flto
 
 SRC = main.cpp
