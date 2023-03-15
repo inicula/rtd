@@ -1,8 +1,13 @@
 # rtd
 
-Minimalistic regular expression to DFA conversion using Dijkstra's 'shunting
-yard' algorithm, followed by Thompson's construction algorithm, followed by the
-powerset construction algorithm.
+Generates a (visual) DFA representation for a regular expression.
+
+Steps:
+
+* Convert the input regex from infix to postfix notation (with the shunting
+  yard algorithm);
+* Convert the regex to a λ-NFA using Thompson's construction algorithm;
+* Convert the λ-NFA to a DFA using the powerset construction algorithm.
 
 ## Operators
 
