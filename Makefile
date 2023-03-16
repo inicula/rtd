@@ -21,11 +21,9 @@ ${OBJ}: numtypes.hpp
 rtd: ${OBJ}
 	${CXX} -o $@ ${OBJ} ${LDFLAGS}
 
-svg:
-	dot -Tsvg graph.dot >graph.svg
-
 tests: rtd
-	rm -f output/*
+	mkdir output 2>/dev/null ; \
+	rm -f output/* ; \
 	for filename in tests/*; do \
 			./rtd -e "$$(cat "$$filename")" >graph.dot && dot -Tsvg graph.dot >output/"$$(basename "$$filename")".svg ; \
 	done

@@ -105,9 +105,9 @@ static constexpr auto OP_PREC = []() {
 static bool operator<(const Transition&, const Transition&);
 static bool operator==(const Transition&, const Transition&);
 static TokenType type_of(char);
-static std::string add_concatenation_op(const std::string_view);
-static std::optional<std::string> get_postfix(const std::string_view);
-static std::optional<NFANode*> get_nfa(const std::string_view);
+static std::string add_concatenation_op(std::string_view);
+static std::optional<std::string> get_postfix(std::string_view);
+static std::optional<NFANode*> get_nfa(std::string_view);
 static Graph to_graph(NFANode*);
 static void add_transitive_closure_helper(usize, usize, std::vector<Transition>&, Graph&);
 static void add_transitive_closure(Graph&);
@@ -115,7 +115,7 @@ static void remove_lambdas(Graph&);
 static Graph to_dfa_graph(const Graph&);
 static void print_components(const Graph&, FILE*);
 static void set_attrs(void*, const AgobjAttrs&);
-static void export_graph(const Graph&, FILE*, const std::string&);
+static void export_graph(const Graph&, FILE*, std::string_view);
 static void usage();
 
 /* Functions definitions  */
@@ -572,14 +572,14 @@ set_attrs(void* obj, const AgobjAttrs& attrs)
 }
 
 void
-export_graph(const Graph& g, FILE* output, const std::string& reg)
+export_graph(const Graph& g, FILE* output, const std::string_view infix)
 {
     const auto& [adj, flags, _] = g;
     const usize size = adj.size();
 
     Agraph_t* graph = agopen((char*)"g", Agdirected, 0);
     assert(graph);
-    set_attrs(graph, {.label = reg.data(), .font = FONT, .rankdir = "LR"});
+    set_attrs(graph, {.label = infix.data(), .font = FONT, .rankdir = "LR"});
 
     std::vector<Agnode_t*> g_nodes(size, nullptr);
     std::array<char, 4> lb = {};
