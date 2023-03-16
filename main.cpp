@@ -84,6 +84,7 @@ struct AgobjAttrs {
     const char* style = nullptr;
     const char* font = nullptr;
     const char* color = nullptr;
+    const char* rankdir = nullptr;
 };
 
 /* Globals */
@@ -543,7 +544,7 @@ print_components(const Graph& g, FILE* output)
     /* Print start state */
     fprintf(output, "START STATE: q%lu\n", g.start);
 
-    /* Print final state */
+    /* Print final states */
     fprintf(output, "FINAL STATES: {");
     bool first = true;
     for (usize src = 0; src < size; ++src) {
@@ -566,6 +567,8 @@ set_attrs(void* obj, const AgobjAttrs& attrs)
         agsafeset(obj, (char*)"fontname", (char*)attrs.font, (char*)"");
     if (attrs.style)
         agsafeset(obj, (char*)"style", (char*)attrs.style, (char*)"");
+    if (attrs.rankdir)
+        agsafeset(obj, (char*)"rankdir", (char*)attrs.rankdir, (char*)"");
 }
 
 void
@@ -576,7 +579,7 @@ export_graph(const Graph& g, FILE* output, const std::string& reg)
 
     Agraph_t* graph = agopen((char*)"g", Agdirected, 0);
     assert(graph);
-    set_attrs(graph, {.label = reg.data(), .font = FONT});
+    set_attrs(graph, {.label = reg.data(), .font = FONT, .rankdir = "LR"});
 
     std::vector<Agnode_t*> g_nodes(size, nullptr);
     std::array<char, 4> lb = {};
