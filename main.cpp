@@ -331,10 +331,8 @@ to_graph_helper(NFANode* src, Graph& g)
 
     src->visited = true;
     src->id = adj.size();
-    while (src->id >= adj.size()) {
-        adj.push_back({});
-        flags.push_back({});
-    }
+    adj.emplace_back();
+    flags.emplace_back();
 
     if (g.start == START_UNINITIALIZED) {
         flags[src->id] |= START;
