@@ -590,19 +590,23 @@ export_graph(const Graph& g, FILE* output, const std::string& reg)
         assert(node);
         g_nodes[src] = node;
 
+        AgobjAttrs attrs;
         switch (flags[src] & (START | FINAL)) {
         case START | FINAL:
-            set_attrs(node, {.style = "wedged", .font = FONT, .color = START_FINAL_COLOR});
+            attrs = {.style = "wedged", .font = FONT, .color = START_FINAL_COLOR};
             break;
         case START:
-            set_attrs(node, {.style = "filled", .font = FONT, .color = START_COLOR});
+            attrs = {.style = "filled", .font = FONT, .color = START_COLOR};
             break;
         case FINAL:
-            set_attrs(node, {.style = "filled", .font = FONT, .color = FINAL_COLOR});
+            attrs = {.style = "filled", .font = FONT, .color = FINAL_COLOR};
             break;
         default:
+            attrs = {.font = FONT};
             break;
         }
+
+        set_attrs(node, attrs);
     }
 
     for (usize src = 0; src < size; ++src) {
