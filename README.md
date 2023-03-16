@@ -21,7 +21,7 @@ Steps:
 
 ### Dependencies:
 
-* C++17 compatible compiler;
+* C++20 compatible compiler;
 * `make`;
 * [`graphviz`](https://graphviz.org/docs/library/);
 * `pkg-config`.
