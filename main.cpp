@@ -330,7 +330,7 @@ to_graph_helper(NFANode* src, Graph& g)
     node_ptrs.push_back(src);
 
     src->visited = true;
-    src->id = adj.size(); /* Pre-order traversal, which is why `START_NODE_ID` is 0 */
+    src->id = adj.size();
     while (src->id >= adj.size()) {
         adj.push_back({});
         flags.push_back({});
