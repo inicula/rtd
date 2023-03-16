@@ -88,7 +88,7 @@ struct AgobjAttrs {
 };
 
 /* Globals */
-static bool in_alphabet[NUM_CHARS] = {};
+static std::string_view alphabet = DEFAULT_ALPHABET;
 static std::vector<NFANode*> node_ptrs;
 static constexpr auto OP_PREC = []() {
     std::array<u8, NUM_CHARS> arr = {};
@@ -149,14 +149,14 @@ type_of(char token)
 {
     auto token_idx = u8(token);
 
-    if (in_alphabet[token_idx])
-        return TokenType::REGULAR;
     if (OP_PREC[token_idx])
         return TokenType::OPERATOR;
     if (token == '(')
         return TokenType::LEFT_PAREN;
     if (token == ')')
         return TokenType::RIGHT_PAREN;
+    if (alphabet.find(token) != alphabet.npos)
+        return TokenType::REGULAR;
     return TokenType::ERROR;
 }
 
@@ -655,7 +655,6 @@ usage()
 int
 main(const int argc, char* argv[])
 {
-    const char* alphabet = DEFAULT_ALPHABET;
     const char* output_path = nullptr;
     bool all_alnum = false;
     bool exp = false;
@@ -686,6 +685,10 @@ main(const int argc, char* argv[])
 
     if (all_alnum)
         alphabet = ALL_ALPHANUMS;
+    if (alphabet.empty()) {
+        fprintf(stderr, "The alphabet can not be empty\n");
+        return EXIT_FAILURE;
+    }
 
     if (optind >= argc) {
         fprintf(stderr, "Missing <regex> argument\n\n");
@@ -693,20 +696,18 @@ main(const int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    for (char c : std::string_view(alphabet)) {
+    for (char c : alphabet) {
         if (!std::isalnum(c)) {
             fprintf(stderr, "The alphabet can only contain alphanumericals\n");
             return EXIT_FAILURE;
         }
-
-        in_alphabet[u8(c)] = true;
     }
 
     const std::string_view infix = argv[optind];
     const auto with_concat_op = add_concatenation_op(infix);
     const auto postfix = get_postfix(with_concat_op);
     if (!postfix) {
-        fprintf(stderr, "Regex %s is invalid\n", infix.data());
+        fprintf(stderr, "Regex '%s' is invalid\n", infix.data());
         usage();
         return EXIT_FAILURE;
     }
