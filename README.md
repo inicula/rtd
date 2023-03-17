@@ -1,6 +1,8 @@
 # rtd
 
-Generates a (visual) DFA representation for a regular expression.
+Tool for generating a DFA for a given regular expression. It can either print
+the DFA's 5-tuple components, or output the DFA as a
+[DOT](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) file.
 
 Steps:
 
