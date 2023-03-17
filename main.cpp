@@ -459,7 +459,7 @@ to_dfa_graph(const Graph& nfa)
         }
 
         /* Create edges from the source subset through each symbol */
-        for (char target_symbol = 'a'; target_symbol <= 'z'; ++target_symbol) {
+        for (char target_symbol : alphabet) {
             std::unordered_set<usize> dest_subset;
             for (auto src : src_subset) {
                 for (auto [dest, symbol] : nfa.adj[src]) {
