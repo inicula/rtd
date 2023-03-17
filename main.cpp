@@ -50,16 +50,9 @@ enum GraphNodeFlag : u32 {
 /* clang-format on */
 
 /* Structs */
-struct NFANode {
-    NFANode* neighbours[2] = {};
-    char symbols[2] = {};
-    usize id = 0;
-    bool visited = {};
-};
-
 struct NFAFragment {
-    NFANode* start;
-    NFANode* finish;
+    usize start;
+    usize finish;
 };
 
 struct Edge {
@@ -89,7 +82,6 @@ struct AgobjAttrs {
 
 /* Globals */
 static std::string_view alphabet = DEFAULT_ALPHABET;
-static std::vector<NFANode*> node_ptrs;
 static constexpr auto OP_PREC = []() {
     std::array<u8, NUM_CHARS> arr = {};
     arr[OP_KLEENE] = 3;
@@ -107,8 +99,7 @@ static bool operator==(const Transition&, const Transition&);
 static TokenType type_of(char);
 static std::string add_concatenation_op(std::string_view);
 static std::optional<std::string> get_postfix(std::string_view);
-static std::optional<NFANode*> get_nfa(std::string_view);
-static Graph to_graph(NFANode*);
+static std::optional<Graph> get_nfa_graph(std::string_view);
 static void add_transitive_closure_helper(usize, usize, std::vector<Transition>&, Graph&);
 static void add_transitive_closure(Graph&);
 static void remove_lambdas(Graph&);
@@ -254,14 +245,17 @@ get_postfix(const std::string_view infix)
     return postfix;
 }
 
-std::optional<NFANode*>
-get_nfa(const std::string_view postfix)
+std::optional<Graph>
+get_nfa_graph(const std::string_view postfix)
 {
     /* Apply Thompson's construction algorithm */
 
+    Graph g{};
+    auto& [adj, flags, _] = g;
+
     std::stack<NFAFragment, std::vector<NFAFragment>> nfa_components;
     for (char token : postfix) {
-        NFANode *q, *f;
+        usize q, f;
 
         if (token == OP_CONCAT || token == OP_UNION) {
             if (nfa_components.size() < 2)
@@ -273,14 +267,20 @@ get_nfa(const std::string_view postfix)
             nfa_components.pop();
 
             if (token == OP_CONCAT) {
-                *(x.finish) = {{y.start}, {S_LAMBDA}};
+                adj[x.finish] = {{y.start, S_LAMBDA}};
+
                 q = x.start;
                 f = y.finish;
             } else {
-                q = new NFANode{{x.start, y.start}, {S_LAMBDA, S_LAMBDA}};
-                f = new NFANode{};
-                *(x.finish) = {{f}, {S_LAMBDA}};
-                *(y.finish) = {{f}, {S_LAMBDA}};
+                q = adj.size();
+                adj.emplace_back();
+                adj[q] = {{x.start, S_LAMBDA}, {y.start, S_LAMBDA}};
+
+                f = adj.size();
+                adj.emplace_back();
+
+                adj[x.finish] = {{f, S_LAMBDA}};
+                adj[y.finish] = {{f, S_LAMBDA}};
             }
         } else if (token == OP_KLEENE || token == OP_PLUS || token == OP_OPT) {
             if (nfa_components.empty())
@@ -289,25 +289,28 @@ get_nfa(const std::string_view postfix)
             auto x = nfa_components.top();
             nfa_components.pop();
 
-            f = new NFANode;
-            q = new NFANode;
+            f = adj.size();
+            adj.emplace_back();
+            q = adj.size();
+            adj.emplace_back();
 
             if (token == OP_KLEENE) {
-                *f = NFANode{};
-                *q = NFANode{{x.start, f}, {S_LAMBDA, S_LAMBDA}};
-                *(x.finish) = {{x.start, f}, {S_LAMBDA, S_LAMBDA}};
+                adj[q] = {{x.start, S_LAMBDA}, {f, S_LAMBDA}};
+                adj[x.finish] = {{x.start, S_LAMBDA}, {f, S_LAMBDA}};
             } else if (token == OP_PLUS) {
-                *f = NFANode{};
-                *q = NFANode{{x.start}, {S_LAMBDA}};
-                *(x.finish) = {{x.start, f}, {S_LAMBDA, S_LAMBDA}};
+                adj[q] = {{x.start, S_LAMBDA}};
+                adj[x.finish] = {{x.start, S_LAMBDA}, {f, S_LAMBDA}};
             } else {
-                *f = NFANode{};
-                *q = NFANode{{x.start, f}, {S_LAMBDA, S_LAMBDA}};
-                *(x.finish) = {{f}, {S_LAMBDA}};
+                adj[q] = {{x.start, S_LAMBDA}, {f, S_LAMBDA}};
+                adj[x.finish] = {{f, S_LAMBDA}};
             }
         } else {
-            f = new NFANode{};
-            q = new NFANode{{f}, {token}};
+            f = adj.size();
+            adj.emplace_back();
+
+            q = adj.size();
+            adj.emplace_back();
+            adj[q] = {{f, token}};
         }
 
         nfa_components.push({q, f});
@@ -316,52 +319,14 @@ get_nfa(const std::string_view postfix)
     if (nfa_components.empty())
         return std::nullopt;
 
-    return nfa_components.top().start;
-}
+    auto [start, finish] = nfa_components.top();
 
-void
-to_graph_helper(NFANode* src, Graph& g)
-{
-    if (!src || src->visited)
-        return;
+    g.start = start;
 
-    auto& [adj, flags, _] = g;
+    flags.resize(adj.size());
+    flags[start] |= START;
+    flags[finish] |= FINAL;
 
-    node_ptrs.push_back(src);
-
-    src->visited = true;
-    src->id = adj.size();
-    adj.emplace_back();
-    flags.emplace_back();
-
-    if (g.start == START_UNINITIALIZED) {
-        flags[src->id] |= START;
-        g.start = src->id;
-    }
-
-    auto v0 = src->neighbours[0];
-    auto v1 = src->neighbours[1];
-
-    flags[src->id] |= FINAL * (!v0 && !v1);
-
-    if (v0) {
-        to_graph_helper(v0, g);
-        adj[src->id].push_back({v0->id, src->symbols[0]});
-    }
-    if (v1) {
-        to_graph_helper(v1, g);
-        adj[src->id].push_back({v1->id, src->symbols[1]});
-    }
-}
-
-Graph
-to_graph(NFANode* src)
-{
-    Graph g = {};
-    g.start = START_UNINITIALIZED;
-    to_graph_helper(src, g);
-
-    assert(g.start != START_UNINITIALIZED);
     return g;
 }
 
@@ -720,24 +685,18 @@ main(const int argc, char* argv[])
             postfix->data());
 #endif
 
-    auto root = get_nfa(*postfix);
-    if (!root) {
+    auto nfa_graph = get_nfa_graph(*postfix);
+    if (!nfa_graph) {
         fprintf(stderr, "Failed to make NFA from regex\n");
         usage();
         return EXIT_FAILURE;
     }
 
-    auto nfa_graph = to_graph(*root);
-
-    /* No need for the old NFA representation anymore */
-    for (NFANode* node : node_ptrs)
-        delete node;
-
     /* Transform λ-NFA to NFA without λ-transitions */
-    add_transitive_closure(nfa_graph);
-    remove_lambdas(nfa_graph);
+    add_transitive_closure(*nfa_graph);
+    remove_lambdas(*nfa_graph);
 
-    auto dfa_graph = to_dfa_graph(nfa_graph);
+    auto dfa_graph = to_dfa_graph(*nfa_graph);
 
     auto output = output_path ? fopen(output_path, "w") : stdout;
     if (!output) {
