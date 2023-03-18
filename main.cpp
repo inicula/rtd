@@ -402,6 +402,9 @@ to_dfa_graph(const Graph& nfa)
 {
     Graph dfa{};
 
+    if (nfa.adj.empty())
+        return dfa;
+
     std::queue<std::unordered_set<usize>> queue;
     std::unordered_map<std::unordered_set<usize>, usize> ids;
 
@@ -419,12 +422,8 @@ to_dfa_graph(const Graph& nfa)
         auto src_subset_id = ids.at(src_subset);
 
         /* Check if this subset will become a final node */
-        for (auto src : src_subset) {
-            if (nfa.flags[src] & FINAL) {
-                dfa.flags[src_subset_id] |= FINAL;
-                break;
-            }
-        }
+        for (auto src : src_subset)
+            dfa.flags[src_subset_id] |= nfa.flags[src] & FINAL;
 
         /* Create edges from the source subset through each symbol */
         for (char target_symbol : alphabet) {
