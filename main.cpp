@@ -400,25 +400,28 @@ remove_lambdas(Graph& g)
 Graph
 to_dfa_graph(const Graph& nfa)
 {
-    static constexpr usize first_id = 1;
-    usize next_id = first_id;
-    std::vector<Edge> edges;
+    Graph dfa{};
+
     std::queue<std::unordered_set<usize>> queue;
     std::unordered_map<std::unordered_set<usize>, usize> ids;
-    std::unordered_set<usize> finals;
 
     queue.push({nfa.start});
-    ids.insert({{nfa.start}, next_id++});
+    ids.insert({{nfa.start}, dfa.adj.size()});
+    dfa.adj.emplace_back();
+    dfa.flags.emplace_back();
+    dfa.flags[0] |= START;
+    dfa.start = 0;
+
     while (!queue.empty()) {
         auto src_subset = std::move(queue.front());
         queue.pop();
 
-        auto src_subset_id = ids[src_subset];
+        auto src_subset_id = ids.at(src_subset);
 
         /* Check if this subset will become a final node */
         for (auto src : src_subset) {
             if (nfa.flags[src] & FINAL) {
-                finals.insert(src_subset_id);
+                dfa.flags[src_subset_id] |= FINAL;
                 break;
             }
         }
@@ -436,34 +439,25 @@ to_dfa_graph(const Graph& nfa)
             if (dest_subset.empty())
                 continue;
 
-            usize& dest_subset_id = ids[dest_subset];
+            auto dest_subset_id = dfa.adj.size();
+            auto [it, inserted] = ids.insert({dest_subset, dest_subset_id});
 
             /*
              *  If this subset has not been visited yet, give it an identifier
              *  and add it to the queue.
              */
-            if (!dest_subset_id) {
-                dest_subset_id = next_id++;
+            if (inserted) {
+                dfa.adj.emplace_back();
+                dfa.flags.emplace_back();
                 queue.push(std::move(dest_subset));
+            } else {
+                dest_subset_id = it->second;
             }
 
             /* Create the actual edge from the source subset to the destination */
-            edges.push_back({src_subset_id, dest_subset_id, target_symbol});
+            dfa.adj[src_subset_id].emplace_back(dest_subset_id, target_symbol);
         }
     }
-
-    Graph dfa{};
-    dfa.adj.resize(next_id - 1);
-    dfa.flags.resize(next_id - 1);
-
-    for (auto& e : edges)
-        dfa.adj[e.src - 1].push_back({e.dest - 1, e.symbol});
-    for (auto src : finals)
-        dfa.flags[src - 1] |= FINAL;
-
-    auto start_subset_id = first_id - 1;
-    dfa.flags[start_subset_id] |= START;
-    dfa.start = start_subset_id;
 
     return dfa;
 }
