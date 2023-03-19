@@ -30,6 +30,7 @@
 #define OP_KLEENE           '*'
 #define OP_PLUS             '+'
 #define OP_OPT              '?'
+#define IS_UNARY(x)         (x == OP_KLEENE || x == OP_PLUS || x == OP_OPT)
 #define NUM_CHARS           (1 << 8)
 #define LAMBDA_UTF          {char(0xce), char(0xbb)}
 
@@ -165,19 +166,9 @@ add_concatenation_op(const std::string_view infix)
         const auto t_b = type_of(b);
 
         /* Cases where the concatenation operator needs to be added */
-        /* clang-format off */
-        if ((t_a == TokenType::REGULAR && t_b == TokenType::REGULAR) ||
-            (t_a == TokenType::REGULAR && b == '(') ||
-            (a == OP_KLEENE && t_b == TokenType::REGULAR) ||
-            (a == OP_KLEENE && b == '(') ||
-            (a == OP_PLUS && t_b == TokenType::REGULAR) ||
-            (a == OP_PLUS && b == '(') ||
-            (a == OP_OPT && t_b == TokenType::REGULAR) ||
-            (a == OP_OPT && b == '(') ||
-            (a == ')' && t_b == TokenType::REGULAR) ||
-            (a == ')' && b == '('))
+        if ((t_a == TokenType::REGULAR || IS_UNARY(a) || a == ')') &&
+            (t_b == TokenType::REGULAR || b == '('))
             result += OP_CONCAT;
-        /* clang-format on */
 
         result += b;
     }
