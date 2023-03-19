@@ -29,6 +29,6 @@ tests: rtd
 	done
 
 clean:
-	rm -f rtd ${OBJ} graph.dot graph.svg
+	rm -rf rtd ${OBJ} graph.dot graph.svg output
 
 .PHONY: all options svg tests clean
