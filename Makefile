@@ -16,8 +16,6 @@ options:
 .cpp.o:
 	${CXX} -c ${CXXFLAGS} $<
 
-${OBJ}: numtypes.hpp
-
 rtd: ${OBJ}
 	${CXX} -o $@ ${OBJ} ${LDFLAGS}
 
