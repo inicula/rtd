@@ -125,9 +125,9 @@ static void usage();
 
 /* Functions definitions  */
 template<>
-struct std::hash<std::unordered_set<usize>> {
+struct std::hash<std::vector<usize>> {
     std::size_t
-    operator()(const std::unordered_set<usize>& xs) const noexcept
+    operator()(const std::vector<usize>& xs) const noexcept
     {
         std::size_t seed = 0;
         for (std::size_t x : xs)
@@ -409,8 +409,8 @@ to_dfa_graph(const Graph& nfa)
     if (nfa.adj.empty())
         return dfa;
 
-    std::queue<std::unordered_set<usize>> queue;
-    std::unordered_map<std::unordered_set<usize>, usize> ids;
+    std::queue<std::vector<usize>> queue;
+    std::unordered_map<std::vector<usize>, usize> ids;
 
     queue.push({nfa.start});
     ids.insert({{nfa.start}, dfa.adj.size()});
@@ -443,7 +443,8 @@ to_dfa_graph(const Graph& nfa)
                 continue;
 
             auto dest_subset_id = dfa.adj.size();
-            auto [it, inserted] = ids.insert({dest_subset, dest_subset_id});
+            auto [it, inserted] = ids.insert(
+                {std::vector(dest_subset.begin(), dest_subset.end()), dest_subset_id});
 
             /*
              *  If this subset has not been visited yet, give it an identifier
@@ -452,7 +453,7 @@ to_dfa_graph(const Graph& nfa)
             if (inserted) {
                 dfa.adj.emplace_back();
                 dfa.flags.emplace_back();
-                queue.push(std::move(dest_subset));
+                queue.push(std::vector(dest_subset.begin(), dest_subset.end()));
             } else {
                 dest_subset_id = it->second;
             }
