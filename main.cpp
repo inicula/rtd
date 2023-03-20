@@ -458,7 +458,7 @@ to_dfa_graph(const Graph& nfa)
                 dest_subset_id = it->second;
             }
 
-            /* Create the actual edge from the source subset to the destination */
+            /* Create the edge from the source subset to the destination */
             dfa.adj[src_subset_id].emplace_back(dest_subset_id, target_symbol);
         }
     }
