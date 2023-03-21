@@ -42,7 +42,27 @@ $ cd rtd
 $ make
 ```
 
-### Example:
+### Examples:
+
+```
+$ ./rtd -h
+USAGE:
+    rtd [FLAGS/OPTIONS] <regex>
+
+FLAGS:
+    -h
+        Print help info.
+    -a
+        Set the alphabet of the regex as all alphanumericals.
+    -e
+        Export the graph in DOT language (by default, only the DFA components will be printed).
+
+OPTIONS:
+    -s <alphabet>
+        Set the alphabet of the regex (only alphanumericals allowed).
+    -o <output_file>
+        Set the path at which the graph file will be written (default is stdout).
+```
 
 ```bash
 $ ./rtd -e '(a|b)*abb' >graph.dot
