@@ -95,7 +95,7 @@ struct AgobjAttrs {
 };
 
 /* Globals */
-static std::string_view alphabet = DEFAULT_ALPHABET;
+static std::string alphabet = DEFAULT_ALPHABET;
 static constexpr auto OP_PREC = []() {
     std::array<u8, NUM_CHARS> arr = {};
     arr[OP_KLEENE] = 3;
@@ -665,6 +665,10 @@ main(const int argc, char* argv[])
             return EXIT_FAILURE;
         }
     }
+
+    /* Remove duplicates from alphabet input */
+    auto set = std::unordered_set<char>(alphabet.begin(), alphabet.end());
+    alphabet = std::string(set.begin(), set.end());
 
     const std::string_view infix = argv[optind];
     const auto with_concat_op = add_concatenation_op(infix);
