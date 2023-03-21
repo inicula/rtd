@@ -669,7 +669,7 @@ main(const int argc, char* argv[])
     }
 
     /* Remove duplicates from alphabet input */
-    auto set = std::unordered_set<char>(alphabet.begin(), alphabet.end());
+    auto set = std::set<char>(alphabet.begin(), alphabet.end());
     alphabet = std::string(set.begin(), set.end());
 
     const std::string_view infix = argv[optind];
