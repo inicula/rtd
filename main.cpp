@@ -474,25 +474,27 @@ print_components(const Graph& g, FILE* output)
     auto size = adj.size();
 
     /* Print states */
-    fprintf(output, "STATES: {q%lu", start);
+    fprintf(output, "STATES = {");
+    bool first = true;
     for (usize src = 0; src < size; ++src) {
-        if (src == start)
-            continue;
-
-        fprintf(output, ", q%lu", src);
+        fprintf(output, first ? "q%lu" : ", q%lu", src);
+        first = false;
     }
     fprintf(output, "}\n");
 
     /* Print alphabet */
-    std::set<char> sigma;
+    std::set<char> min_alphabet;
     for (usize src = 0; src < size; ++src) {
         for (auto& [_, symbol] : adj[src])
-            sigma.insert(symbol);
+            min_alphabet.insert(symbol);
     }
 
-    fprintf(output, "SIGMA: {%c", *sigma.begin());
-    for (auto it = std::next(sigma.begin()); it != sigma.end(); ++it)
-        fprintf(output, ", %c", *it);
+    fprintf(output, "SIGMA = {");
+    first = true;
+    for (auto it = min_alphabet.begin(); it != min_alphabet.end(); ++it) {
+        fprintf(output, first ? "%c" : ", %c", *it);
+        first = false;
+    }
     fprintf(output, "}\n");
 
     /* Print transitions */
@@ -503,11 +505,11 @@ print_components(const Graph& g, FILE* output)
     }
 
     /* Print start state */
-    fprintf(output, "START STATE: q%lu\n", g.start);
+    fprintf(output, "START STATE = q%lu\n", g.start);
 
     /* Print final states */
-    fprintf(output, "FINAL STATES: {");
-    bool first = true;
+    fprintf(output, "FINAL STATES = {");
+    first = true;
     for (usize src = 0; src < size; ++src) {
         if (flags[src] & FINAL) {
             fprintf(output, first ? "q%lu" : ", q%lu", src);
