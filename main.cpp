@@ -69,12 +69,6 @@ struct NFAFragment {
     usize finish;
 };
 
-struct Edge {
-    usize src;
-    usize dest;
-    char symbol;
-};
-
 struct Transition {
     usize dest;
     char symbol;
