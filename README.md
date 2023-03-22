@@ -44,6 +44,8 @@ $ make
 
 ### Examples:
 
+#### Commands:
+
 ```
 $ ./rtd -h
 USAGE:
@@ -69,6 +71,10 @@ $ ./rtd -e '(a|b)*abb' >graph.dot
 $ dot -Tsvg graph.dot >graph.svg
 $ firefox graph.svg
 ```
+
+#### Results:
+
+* ![](example.svg)
 
 ## Resources
 
