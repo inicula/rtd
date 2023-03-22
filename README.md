@@ -6,27 +6,27 @@ the DFA's 5-tuple components, or output the DFA as a
 
 Steps:
 
-* Convert the input regex from infix to postfix notation (with the shunting
-  yard algorithm);
-* Convert the regex to a λ-NFA using Thompson's construction algorithm;
+* Convert the input regex from infix to postfix notation using the shunting
+  yard algorithm.
+* Convert the regex to a λ-NFA using Thompson's construction algorithm.
 * Convert the λ-NFA to a DFA using the powerset construction algorithm.
 
 ## Operators
 
-* `<s1>|<s2>` - Matches either the subexpression `<s1>` or `<s2>`;
-* `<s1><s2>` - Matches the subexpression `<s1>` concatenated with `<s2>`;
-* `<s>*` - Matches zero or more occurrences of `<s>`;
-* `<s>+` - Matches one or more occurrences of `<s>`;
-* `<s>?` - Matches zero or one occurance of `<s>`.
+* `<s1>|<s2>` - Matches either the subexpression `<s1>` or `<s2>`
+* `<s1><s2>` - Matches the subexpression `<s1>` concatenated with `<s2>`
+* `<s>*` - Matches zero or more occurrences of `<s>`
+* `<s>+` - Matches one or more occurrences of `<s>`
+* `<s>?` - Matches zero or one occurance of `<s>`
 
 ## Building
 
 ### Dependencies:
 
-* C++20 compatible compiler;
-* `make`;
-* [`graphviz`](https://graphviz.org/docs/library/);
-* `pkg-config`.
+* GCC release >= 10.1 or Clang release >= 16.0.0
+* `make`
+* [`graphviz`](https://graphviz.org/docs/library/)
+* `pkg-config`
 
 On Debian-based systems, they can usually be installed as follows:
 

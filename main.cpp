@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <set>
+#include <ranges>
 #include <algorithm>
 #include <numeric>
 #include <optional>
@@ -28,6 +29,9 @@ using i32   = int32_t;
 using i64   = int64_t;
 using usize = size_t;
 using isize = ssize_t;
+
+/* Namespace aliases */
+namespace ranges = std::ranges;
 
 /* Macros */
 #define DEFAULT_ALPHABET    "abcdefghijklmnopqrstuvwxyz"
@@ -70,6 +74,8 @@ struct NFAFragment {
 };
 
 struct Transition {
+    constexpr auto operator<=>(const Transition&) const = default;
+
     usize dest;
     char symbol;
 };
@@ -102,8 +108,6 @@ static constexpr auto OP_PREC = []() {
 }();
 
 /* Functions declarations */
-static bool operator<(const Transition&, const Transition&);
-static bool operator==(const Transition&, const Transition&);
 static TokenType type_of(char);
 static std::string add_concatenation_op(std::string_view);
 static std::optional<std::string> get_postfix(std::string_view);
@@ -130,18 +134,6 @@ struct std::hash<std::vector<usize>> {
         return seed;
     }
 };
-
-bool
-operator<(const Transition& x, const Transition& y)
-{
-    return std::tie(x.dest, x.symbol) < std::tie(y.dest, y.symbol);
-}
-
-bool
-operator==(const Transition& x, const Transition& y)
-{
-    return std::tie(x.dest, x.symbol) == std::tie(y.dest, y.symbol);
-}
 
 TokenType
 type_of(char token)
@@ -385,13 +377,12 @@ remove_lambdas(Graph& g)
     }
 
     for (auto& ts : adj) {
-        auto begin_of_lambda =
-            std::partition(ts.begin(), ts.end(), [](auto& t) { return t.symbol != S_LAMBDA; });
-        ts.erase(begin_of_lambda, ts.end());
+        auto lambdas = ranges::partition(ts, [](auto& t) { return t.symbol != S_LAMBDA; });
+        ts.erase(lambdas.begin(), lambdas.end());
 
-        std::sort(ts.begin(), ts.end());
-        auto begin_of_duplicates = std::unique(ts.begin(), ts.end());
-        ts.erase(begin_of_duplicates, ts.end());
+        ranges::sort(ts);
+        auto duplicates = ranges::unique(ts);
+        ts.erase(duplicates.begin(), duplicates.end());
     }
 }
 
