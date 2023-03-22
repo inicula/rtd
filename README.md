@@ -74,7 +74,25 @@ $ firefox graph.svg
 
 #### Results:
 
-* ![](example.svg)
+```
+STATES = {q0, q1, q2, q3, q4}
+SIGMA = {a, b}
+TRANSITIONS:
+        δ(q0, a) = q1
+        δ(q0, b) = q2
+        δ(q1, a) = q1
+        δ(q1, b) = q3
+        δ(q2, a) = q1
+        δ(q2, b) = q2
+        δ(q3, a) = q1
+        δ(q3, b) = q4
+        δ(q4, a) = q1
+        δ(q4, b) = q2
+START STATE = q0
+FINAL STATES = {q4}
+```
+
+![](example.svg)
 
 ## Resources
 
