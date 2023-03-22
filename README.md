@@ -44,7 +44,7 @@ $ make
 
 ### Examples:
 
-#### Commands:
+* Get usage info:
 
 ```
 $ ./rtd -h
@@ -66,15 +66,10 @@ OPTIONS:
         Set the path at which the graph file will be written (default is stdout).
 ```
 
+* Get the DFA components for `(a|b)*abb`:
+
 ```bash
-$ ./rtd -e '(a|b)*abb' >graph.dot
-$ dot -Tsvg graph.dot >graph.svg
-$ firefox graph.svg
-```
-
-#### Results:
-
-```
+$ ./rtd '(a|b)*abb'
 STATES = {q0, q1, q2, q3, q4}
 SIGMA = {a, b}
 TRANSITIONS:
@@ -90,6 +85,14 @@ TRANSITIONS:
         δ(q4, b) = q2
 START STATE = q0
 FINAL STATES = {q4}
+```
+
+* Get the visual DFA representation for `(a|b)*abb`:
+
+```bash
+$ ./rtd -e '(a|b)*abb' >graph.dot
+$ dot -Tsvg graph.dot >graph.svg
+$ firefox graph.svg
 ```
 
 ![](example.svg)
