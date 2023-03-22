@@ -97,6 +97,13 @@ $ firefox graph.svg
 
 ![](example.svg)
 
+* Get the visual DFA representation for the expressions provided as tests:
+
+```bash
+$ make tests
+$ firefox output/*
+```
+
 ## Resources
 
 * ['Shunting yard' algorithm](https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm);
