@@ -420,8 +420,8 @@ to_dfa_graph(const Graph& nfa)
                 continue;
 
             auto dest_subset_id = dfa.adj.size();
-            auto [it, inserted] = ids.insert(
-                {std::vector(dest_subset.begin(), dest_subset.end()), dest_subset_id});
+            auto dest_vec = std::vector(dest_subset.begin(), dest_subset.end());
+            auto [it, inserted] = ids.emplace(dest_vec, dest_subset_id);
 
             /*
              *  If this subset has not been visited yet, give it an identifier
@@ -430,7 +430,7 @@ to_dfa_graph(const Graph& nfa)
             if (inserted) {
                 dfa.adj.emplace_back();
                 dfa.flags.emplace_back();
-                queue.push(std::vector(dest_subset.begin(), dest_subset.end()));
+                queue.push(std::move(dest_vec));
             } else {
                 dest_subset_id = it->second;
             }
