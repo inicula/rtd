@@ -324,7 +324,7 @@ add_transitive_closure_helper(usize from, usize src, std::vector<Transition>& to
 
     for (auto [dest, symbol] : adj[src]) {
         if (symbol == S_LAMBDA) {
-            to_add.push_back({dest, symbol});
+            to_add.emplace_back(dest, symbol);
             flags[from] |= flags[dest] & FINAL;
 
             add_transitive_closure_helper(from, dest, to_add, g);
@@ -361,7 +361,7 @@ remove_lambdas(Graph& g)
 
             for (auto [w, to_w] : adj[v]) {
                 if (to_w != S_LAMBDA)
-                    to_add.push_back({w, to_w});
+                    to_add.emplace_back(w, to_w);
             }
         }
 
