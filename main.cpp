@@ -20,15 +20,8 @@
 /* Typedefs */
 /* clang-format off */
 using u8    = uint8_t;
-using u16   = uint16_t;
 using u32   = uint32_t;
-using u64   = uint64_t;
-using i8    = int8_t;
-using i16   = int16_t;
-using i32   = int32_t;
-using i64   = int64_t;
 using usize = size_t;
-using isize = ssize_t;
 
 /* Namespace aliases */
 namespace ranges = std::ranges;
@@ -36,7 +29,6 @@ namespace ranges = std::ranges;
 /* Macros */
 #define DEFAULT_ALPHABET    "abcdefghijklmnopqrstuvwxyz"
 #define ALL_ALPHANUMS       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
-#define START_UNINITIALIZED (usize(-1))
 #define START_COLOR         "turquoise"
 #define FINAL_COLOR         "x11green"
 #define START_FINAL_COLOR   START_COLOR ":" FINAL_COLOR
@@ -264,7 +256,7 @@ get_nfa_graph(const std::string_view postfix)
                 adj[x.finish] = {{f, S_LAMBDA}};
                 adj[y.finish] = {{f, S_LAMBDA}};
             }
-        } else if (token == OP_KLEENE || token == OP_PLUS || token == OP_OPT) {
+        } else if (IS_UNARY(token)) {
             if (nfa_components.empty())
                 return std::nullopt;
 
@@ -390,7 +382,7 @@ to_dfa_graph(const Graph& nfa)
     std::unordered_map<std::vector<usize>, usize> ids;
 
     queue.push({nfa.start});
-    ids.insert({{nfa.start}, dfa.adj.size()});
+    ids.insert({{nfa.start}, 0});
     dfa.adj.emplace_back();
     dfa.flags.emplace_back();
     dfa.flags[0] |= START;
