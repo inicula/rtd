@@ -188,17 +188,9 @@ get_postfix(const std::string_view infix)
             postfix += token;
             break;
         case TokenType::OPERATOR:
-            for (;;) {
-                if (operators.empty())
-                    break;
-
-                auto top = operators.top();
-                if (top == '(')
-                    break;
-                if (OP_PREC[u8(top)] < OP_PREC[u8(token)])
-                    break;
-
-                postfix += top;
+            while (!operators.empty() && operators.top() != '(' &&
+                   OP_PREC[u8(operators.top())] >= OP_PREC[u8(token)]) {
+                postfix += operators.top();
                 operators.pop();
             }
 
